@@ -1,0 +1,26 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(docker build *)",
+      "Bash(docker run *)",
+      "Bash(docker rm *)",
+      "Bash(docker stop *)",
+      "Bash(docker info)",
+      "Bash(docker info *)",
+      "Bash(docker --version)",
+      "Bash(open -a *)",
+      "Bash(chmod +x *)",
+      "Bash(npm run build *)",
+      "Bash(npm run dev *)",
+      "Bash(npm run test *)",
+      "Bash(npm run test:unit *)",
+      "Bash(npm run test:e2e *)",
+      "Bash(npm run test:all *)",
+      "Bash(npm install *)",
+      "Bash(npm info *)",
+      "Bash(npx tsc --noEmit *)",
+      "Bash(uv sync *)",
+      "Bash(curl -s http://localhost:*)"
+    ]
+  }
+}
