@@ -147,8 +147,9 @@ export const KanbanBoard = ({ user, onLogout }: KanbanBoardProps) => {
     dueDate?: string | null,
     labelIds?: string[],
     storyPoints?: number | null,
+    assignee?: string | null,
   ) => {
-    const card = await apiCreateCard(columnId, title, details, importance, dueDate, labelIds, activeBoardId, storyPoints);
+    const card = await apiCreateCard(columnId, title, details, importance, dueDate, labelIds, activeBoardId, storyPoints, assignee);
     setBoard((prev) =>
       prev && {
         ...prev,
@@ -168,6 +169,7 @@ export const KanbanBoard = ({ user, onLogout }: KanbanBoardProps) => {
     dueDate?: string | null,
     labelIds?: string[],
     storyPoints?: number | null,
+    assignee?: string | null,
   ) => {
     setBoard((prev) =>
       prev && {
@@ -176,13 +178,13 @@ export const KanbanBoard = ({ user, onLogout }: KanbanBoardProps) => {
           ...prev.cards,
           [cardId]: {
             ...prev.cards[cardId],
-            title, details, importance, dueDate, storyPoints,
+            title, details, importance, dueDate, storyPoints, assignee,
             labelIds: labelIds ?? prev.cards[cardId].labelIds,
           },
         },
       }
     );
-    await apiUpdateCard(cardId, title, details, importance, dueDate, labelIds, activeBoardId, storyPoints);
+    await apiUpdateCard(cardId, title, details, importance, dueDate, labelIds, activeBoardId, storyPoints, assignee);
   };
 
   const handleCardChange = (card: Card) => {

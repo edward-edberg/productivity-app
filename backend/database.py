@@ -70,7 +70,17 @@ def init_db():
                 position INTEGER NOT NULL,
                 importance TEXT NOT NULL DEFAULT 'medium',
                 due_date TEXT,
-                story_points INTEGER DEFAULT NULL
+                story_points INTEGER DEFAULT NULL,
+                assignee TEXT DEFAULT NULL
+            )
+        """)
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS comments (
+                id TEXT PRIMARY KEY,
+                card_id TEXT NOT NULL REFERENCES cards(id),
+                user_id INTEGER NOT NULL REFERENCES users(id),
+                text TEXT NOT NULL,
+                created_at TEXT NOT NULL DEFAULT (datetime('now'))
             )
         """)
         conn.execute("""
@@ -109,6 +119,8 @@ def _migrate(conn):
         conn.execute("ALTER TABLE cards ADD COLUMN due_date TEXT")
     if "story_points" not in cols:
         conn.execute("ALTER TABLE cards ADD COLUMN story_points INTEGER DEFAULT NULL")
+    if "assignee" not in cols:
+        conn.execute("ALTER TABLE cards ADD COLUMN assignee TEXT DEFAULT NULL")
 
     col_cols = {row[1] for row in conn.execute("PRAGMA table_info(columns)")}
     if "wip_limit" not in col_cols:
@@ -154,6 +166,16 @@ def _migrate(conn):
                 text TEXT NOT NULL,
                 checked INTEGER NOT NULL DEFAULT 0,
                 position INTEGER NOT NULL
+            )
+        """)
+    if "comments" not in tables:
+        conn.execute("""
+            CREATE TABLE comments (
+                id TEXT PRIMARY KEY,
+                card_id TEXT NOT NULL REFERENCES cards(id),
+                user_id INTEGER NOT NULL REFERENCES users(id),
+                text TEXT NOT NULL,
+                created_at TEXT NOT NULL DEFAULT (datetime('now'))
             )
         """)
 
@@ -337,6 +359,7 @@ def delete_board(board_id: int):
         for col_id in col_ids:
             conn.execute("DELETE FROM card_labels WHERE card_id IN (SELECT id FROM cards WHERE column_id = ?)", (col_id,))
             conn.execute("DELETE FROM checklist_items WHERE card_id IN (SELECT id FROM cards WHERE column_id = ?)", (col_id,))
+            conn.execute("DELETE FROM comments WHERE card_id IN (SELECT id FROM cards WHERE column_id = ?)", (col_id,))
             conn.execute("DELETE FROM cards WHERE column_id = ?", (col_id,))
         conn.execute("DELETE FROM labels WHERE board_id = ?", (board_id,))
         conn.execute("DELETE FROM columns WHERE board_id = ?", (board_id,))
@@ -429,6 +452,7 @@ def delete_column(column_id: str):
         for card_id in card_ids:
             conn.execute("DELETE FROM card_labels WHERE card_id = ?", (card_id,))
             conn.execute("DELETE FROM checklist_items WHERE card_id = ?", (card_id,))
+            conn.execute("DELETE FROM comments WHERE card_id = ?", (card_id,))
         conn.execute("DELETE FROM cards WHERE column_id = ?", (column_id,))
         conn.execute("DELETE FROM columns WHERE id = ?", (column_id,))
 
@@ -488,11 +512,23 @@ def get_board_data(board_id: int) -> dict:
                 "checked": bool(r["checked"]),
             })
 
+        # Load comment counts per card for this board
+        comment_count_rows = conn.execute(
+            """SELECT co.card_id, COUNT(*) as cnt
+               FROM comments co
+               JOIN cards c ON co.card_id = c.id
+               JOIN columns col ON c.column_id = col.id
+               WHERE col.board_id = ?
+               GROUP BY co.card_id""",
+            (board_id,),
+        ).fetchall()
+        comment_count_map: dict[str, int] = {r["card_id"]: r["cnt"] for r in comment_count_rows}
+
         result_columns = []
         result_cards = {}
         for col in cols:
             cards = conn.execute(
-                "SELECT id, title, details, importance, due_date, story_points FROM cards WHERE column_id = ? ORDER BY position",
+                "SELECT id, title, details, importance, due_date, story_points, assignee FROM cards WHERE column_id = ? ORDER BY position",
                 (col["id"],),
             ).fetchall()
             result_columns.append({
@@ -509,6 +545,8 @@ def get_board_data(board_id: int) -> dict:
                     "importance": card["importance"],
                     "dueDate": card["due_date"],
                     "storyPoints": card["story_points"],
+                    "assignee": card["assignee"],
+                    "commentCount": comment_count_map.get(card["id"], 0),
                     "labelIds": card_label_map.get(card["id"], []),
                     "checklistItems": checklist_map.get(card["id"], []),
                 }
@@ -531,6 +569,7 @@ def create_card(
     due_date: str | None = None,
     label_ids: list[str] | None = None,
     story_points: int | None = None,
+    assignee: str | None = None,
 ) -> dict:
     with get_conn() as conn:
         row = conn.execute(
@@ -541,8 +580,8 @@ def create_card(
         card_id = generate_id("card")
         importance = importance if importance in IMPORTANCE_VALUES else "medium"
         conn.execute(
-            "INSERT INTO cards (id, column_id, title, details, position, importance, due_date, story_points) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-            (card_id, column_id, title, details, position, importance, due_date, story_points),
+            "INSERT INTO cards (id, column_id, title, details, position, importance, due_date, story_points, assignee) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            (card_id, column_id, title, details, position, importance, due_date, story_points, assignee),
         )
         applied_labels = label_ids or []
         for label_id in applied_labels:
@@ -557,6 +596,8 @@ def create_card(
         "importance": importance,
         "dueDate": due_date,
         "storyPoints": story_points,
+        "assignee": assignee,
+        "commentCount": 0,
         "labelIds": applied_labels,
         "checklistItems": [],
     }
@@ -570,12 +611,13 @@ def update_card(
     due_date: str | None = None,
     label_ids: list[str] | None = None,
     story_points: int | None = None,
+    assignee: str | None = None,
 ):
     importance = importance if importance in IMPORTANCE_VALUES else "medium"
     with get_conn() as conn:
         conn.execute(
-            "UPDATE cards SET title = ?, details = ?, importance = ?, due_date = ?, story_points = ? WHERE id = ?",
-            (title, details, importance, due_date, story_points, card_id),
+            "UPDATE cards SET title = ?, details = ?, importance = ?, due_date = ?, story_points = ?, assignee = ? WHERE id = ?",
+            (title, details, importance, due_date, story_points, assignee, card_id),
         )
         if label_ids is not None:
             conn.execute("DELETE FROM card_labels WHERE card_id = ?", (card_id,))
@@ -595,6 +637,7 @@ def delete_card(card_id: str):
             return
         conn.execute("DELETE FROM card_labels WHERE card_id = ?", (card_id,))
         conn.execute("DELETE FROM checklist_items WHERE card_id = ?", (card_id,))
+        conn.execute("DELETE FROM comments WHERE card_id = ?", (card_id,))
         conn.execute(
             "UPDATE cards SET position = position - 1 WHERE column_id = ? AND position > ?",
             (card["column_id"], card["position"]),
@@ -639,6 +682,40 @@ def update_checklist_item(item_id: str, text: str, checked: bool):
 def delete_checklist_item(item_id: str):
     with get_conn() as conn:
         conn.execute("DELETE FROM checklist_items WHERE id = ?", (item_id,))
+
+
+# ─── Comments ──────────────────────────────────────────────────────────────────
+
+def list_comments(card_id: str) -> list[dict]:
+    with get_conn() as conn:
+        rows = conn.execute(
+            """SELECT co.id, co.text, co.created_at, u.username
+               FROM comments co JOIN users u ON co.user_id = u.id
+               WHERE co.card_id = ? ORDER BY co.created_at""",
+            (card_id,),
+        ).fetchall()
+        return [{"id": r["id"], "text": r["text"], "createdAt": r["created_at"], "username": r["username"]} for r in rows]
+
+
+def create_comment(card_id: str, user_id: int, text: str) -> dict:
+    comment_id = generate_id("cmt")
+    with get_conn() as conn:
+        conn.execute(
+            "INSERT INTO comments (id, card_id, user_id, text) VALUES (?, ?, ?, ?)",
+            (comment_id, card_id, user_id, text),
+        )
+        row = conn.execute(
+            """SELECT co.id, co.text, co.created_at, u.username
+               FROM comments co JOIN users u ON co.user_id = u.id
+               WHERE co.id = ?""",
+            (comment_id,),
+        ).fetchone()
+    return {"id": row["id"], "text": row["text"], "createdAt": row["created_at"], "username": row["username"]}
+
+
+def delete_comment(comment_id: str):
+    with get_conn() as conn:
+        conn.execute("DELETE FROM comments WHERE id = ?", (comment_id,))
 
 
 def move_card(card_id: str, to_column_id: str, to_position: int):

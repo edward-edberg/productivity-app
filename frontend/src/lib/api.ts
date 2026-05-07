@@ -1,4 +1,4 @@
-import type { BoardData, BoardSummary, Card, ChecklistItem, Importance, Label } from "./kanban";
+import type { BoardData, BoardSummary, Card, ChecklistItem, Comment, Importance, Label } from "./kanban";
 
 function boardParam(boardId?: number): string {
   return boardId !== undefined ? `?boardId=${boardId}` : "";
@@ -99,11 +99,12 @@ export async function apiCreateCard(
   labelIds?: string[],
   boardId?: number,
   storyPoints?: number | null,
+  assignee?: string | null,
 ): Promise<Card> {
   const res = await fetch(`/api/cards${boardParam(boardId)}`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ columnId, title, details, importance, dueDate, labelIds: labelIds ?? [], storyPoints }),
+    body: JSON.stringify({ columnId, title, details, importance, dueDate, labelIds: labelIds ?? [], storyPoints, assignee }),
   });
   if (!res.ok) throw new Error("Failed to create card");
   return res.json();
@@ -118,12 +119,33 @@ export async function apiUpdateCard(
   labelIds?: string[] | null,
   boardId?: number,
   storyPoints?: number | null,
+  assignee?: string | null,
 ): Promise<void> {
   await fetch(`/api/cards/${cardId}${boardParam(boardId)}`, {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ title, details, importance, dueDate, labelIds, storyPoints }),
+    body: JSON.stringify({ title, details, importance, dueDate, labelIds, storyPoints, assignee }),
   });
+}
+
+export async function apiListComments(cardId: string, boardId?: number): Promise<Comment[]> {
+  const res = await fetch(`/api/cards/${cardId}/comments${boardParam(boardId)}`);
+  if (!res.ok) throw new Error("Failed to fetch comments");
+  return res.json();
+}
+
+export async function apiCreateComment(cardId: string, text: string, boardId?: number): Promise<Comment> {
+  const res = await fetch(`/api/cards/${cardId}/comments${boardParam(boardId)}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ text }),
+  });
+  if (!res.ok) throw new Error("Failed to create comment");
+  return res.json();
+}
+
+export async function apiDeleteComment(cardId: string, commentId: string, boardId?: number): Promise<void> {
+  await fetch(`/api/cards/${cardId}/comments/${commentId}${boardParam(boardId)}`, { method: "DELETE" });
 }
 
 export async function apiAddChecklistItem(cardId: string, text: string, boardId?: number): Promise<ChecklistItem> {

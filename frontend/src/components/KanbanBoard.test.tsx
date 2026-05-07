@@ -27,7 +27,7 @@ vi.mock("@/lib/api", () => ({
   apiCreateColumn: vi.fn().mockResolvedValue({ id: "col-new", title: "New Column", cardIds: [] }),
   apiDeleteColumn: vi.fn().mockResolvedValue(undefined),
   apiCreateCard: vi.fn().mockImplementation((_colId: string, title: string, details: string) =>
-    Promise.resolve({ id: "card-new", title, details, importance: "medium", dueDate: null, labelIds: [], checklistItems: [], storyPoints: null })
+    Promise.resolve({ id: "card-new", title, details, importance: "medium", dueDate: null, labelIds: [], checklistItems: [], storyPoints: null, assignee: null, commentCount: 0 })
   ),
   apiDeleteCard: vi.fn().mockResolvedValue(undefined),
   apiMoveCard: vi.fn().mockResolvedValue(undefined),
@@ -36,6 +36,9 @@ vi.mock("@/lib/api", () => ({
   apiAddChecklistItem: vi.fn().mockResolvedValue({ id: "chk-1", text: "test", checked: false }),
   apiUpdateChecklistItem: vi.fn().mockResolvedValue(undefined),
   apiDeleteChecklistItem: vi.fn().mockResolvedValue(undefined),
+  apiListComments: vi.fn().mockResolvedValue([]),
+  apiCreateComment: vi.fn().mockResolvedValue({ id: "cmt-1", text: "test", createdAt: "2026-01-01", username: "testuser" }),
+  apiDeleteComment: vi.fn().mockResolvedValue(undefined),
 }));
 
 vi.mock("@/lib/auth", () => ({ logout: vi.fn() }));

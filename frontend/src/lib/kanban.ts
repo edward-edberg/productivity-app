@@ -12,6 +12,13 @@ export type ChecklistItem = {
   checked: boolean;
 };
 
+export type Comment = {
+  id: string;
+  text: string;
+  createdAt: string;
+  username: string;
+};
+
 export type Card = {
   id: string;
   title: string;
@@ -21,6 +28,8 @@ export type Card = {
   labelIds: string[];
   storyPoints?: number | null;
   checklistItems?: ChecklistItem[];
+  assignee?: string | null;
+  commentCount?: number;
 };
 
 export type Column = {

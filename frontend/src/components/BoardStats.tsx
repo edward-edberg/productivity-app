@@ -17,6 +17,7 @@ export const BoardStats = ({ board }: BoardStatsProps) => {
     return new Date(c.dueDate) < new Date(new Date().toDateString());
   }).length;
 
+  const totalPoints = cards.reduce((sum, c) => sum + (c.storyPoints ?? 0), 0);
   const doneCol = board.columns[board.columns.length - 1];
   const doneCount = doneCol?.cardIds.length ?? 0;
   const progress = total > 0 ? Math.round((doneCount / total) * 100) : 0;
@@ -52,6 +53,15 @@ export const BoardStats = ({ board }: BoardStatsProps) => {
           </span>
         )}
       </div>
+
+      {totalPoints > 0 && (
+        <>
+          <div className="hidden sm:block w-px h-4 bg-[var(--stroke)]" />
+          <span className="flex items-center gap-1 text-slate-600">
+            <span className="font-semibold">{totalPoints}</span> pts
+          </span>
+        </>
+      )}
 
       {overdue > 0 && (
         <>

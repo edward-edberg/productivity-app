@@ -38,6 +38,7 @@ class CreateCardBody(BaseModel):
     dueDate: str | None = None
     labelIds: list[str] = []
     storyPoints: int | None = None
+    assignee: str | None = None
 
 
 class UpdateCardBody(BaseModel):
@@ -47,6 +48,11 @@ class UpdateCardBody(BaseModel):
     dueDate: str | None = None
     labelIds: list[str] | None = None
     storyPoints: int | None = None
+    assignee: str | None = None
+
+
+class CreateCommentBody(BaseModel):
+    text: str
 
 
 class SetWipLimitBody(BaseModel):
@@ -186,7 +192,7 @@ def set_card_labels(card_id: str, body: SetCardLabelsBody, board_id: int = Depen
 def create_card(body: CreateCardBody, board_id: int = Depends(require_board_id)):
     card = db.create_card(
         body.columnId, body.title, body.details,
-        body.importance, body.dueDate, body.labelIds, body.storyPoints,
+        body.importance, body.dueDate, body.labelIds, body.storyPoints, body.assignee,
     )
     return card
 
@@ -195,7 +201,7 @@ def create_card(body: CreateCardBody, board_id: int = Depends(require_board_id))
 def update_card(card_id: str, body: UpdateCardBody, board_id: int = Depends(require_board_id)):
     db.update_card(
         card_id, body.title, body.details,
-        body.importance, body.dueDate, body.labelIds, body.storyPoints,
+        body.importance, body.dueDate, body.labelIds, body.storyPoints, body.assignee,
     )
     return {"ok": True}
 
@@ -233,4 +239,22 @@ def delete_card(card_id: str, board_id: int = Depends(require_board_id)):
 @router.post("/cards/{card_id}/move")
 def move_card(card_id: str, body: MoveCardBody, board_id: int = Depends(require_board_id)):
     db.move_card(card_id, body.columnId, body.position)
+    return {"ok": True}
+
+
+# ─── Comment endpoints ─────────────────────────────────────────────────────────
+
+@router.get("/cards/{card_id}/comments")
+def list_comments(card_id: str, board_id: int = Depends(require_board_id)):
+    return db.list_comments(card_id)
+
+
+@router.post("/cards/{card_id}/comments")
+def create_comment(card_id: str, body: CreateCommentBody, user_id: int = Depends(require_user_id), board_id: int = Depends(require_board_id)):
+    return db.create_comment(card_id, user_id, body.text)
+
+
+@router.delete("/cards/{card_id}/comments/{comment_id}")
+def delete_comment(card_id: str, comment_id: str, board_id: int = Depends(require_board_id)):
+    db.delete_comment(comment_id)
     return {"ok": True}

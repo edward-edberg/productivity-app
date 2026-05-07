@@ -18,7 +18,7 @@ type KanbanColumnProps = {
   onWipLimitChange: (columnId: string, wipLimit: number | null) => void;
   onAddCard: (columnId: string, title: string, details: string, importance: Importance, dueDate?: string | null, labelIds?: string[], storyPoints?: number | null) => void;
   onDeleteCard: (columnId: string, cardId: string) => void;
-  onUpdateCard: (cardId: string, title: string, details: string, importance: Importance, dueDate?: string | null, labelIds?: string[], storyPoints?: number | null) => void;
+  onUpdateCard: (cardId: string, title: string, details: string, importance: Importance, dueDate?: string | null, labelIds?: string[], storyPoints?: number | null, assignee?: string | null) => void;
   onLabelsChange: (labels: Label[]) => void;
   onCardChange: (card: Card) => void;
 };

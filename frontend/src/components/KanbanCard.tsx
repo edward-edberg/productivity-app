@@ -1,20 +1,27 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import clsx from "clsx";
-import type { Card, ChecklistItem, Importance, Label } from "@/lib/kanban";
+import type { Card, ChecklistItem, Comment, Importance, Label } from "@/lib/kanban";
 import { IMPORTANCE_CONFIG, isOverdue, formatDueDate } from "@/lib/kanban";
 import { LabelPicker } from "@/components/LabelPicker";
-import { apiAddChecklistItem, apiUpdateChecklistItem, apiDeleteChecklistItem } from "@/lib/api";
+import {
+  apiAddChecklistItem,
+  apiUpdateChecklistItem,
+  apiDeleteChecklistItem,
+  apiListComments,
+  apiCreateComment,
+  apiDeleteComment,
+} from "@/lib/api";
 
 type KanbanCardProps = {
   card: Card;
   labels: Label[];
   boardId?: number;
   onDelete: (cardId: string) => void;
-  onUpdate: (cardId: string, title: string, details: string, importance: Importance, dueDate?: string | null, labelIds?: string[], storyPoints?: number | null) => void;
+  onUpdate: (cardId: string, title: string, details: string, importance: Importance, dueDate?: string | null, labelIds?: string[], storyPoints?: number | null, assignee?: string | null) => void;
   onLabelsChange: (labels: Label[]) => void;
   onCardChange: (card: Card) => void;
 };
@@ -28,6 +35,12 @@ const TrashIcon = () => (
 const EditIcon = () => (
   <svg width="13" height="13" viewBox="0 0 13 13" fill="none" aria-hidden>
     <path d="M9.5 1.5l2 2L4 11H2v-2l7.5-7.5z" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
+  </svg>
+);
+
+const CommentIcon = () => (
+  <svg width="11" height="11" viewBox="0 0 13 13" fill="none" aria-hidden>
+    <path d="M11.5 8a1 1 0 01-1 1H4l-2.5 2.5V2a1 1 0 011-1h8a1 1 0 011 1v6z" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" />
   </svg>
 );
 
@@ -116,23 +129,109 @@ function ChecklistEditor({ cardId, boardId, items, onChange }: ChecklistEditorPr
   );
 }
 
+type CommentThreadProps = {
+  cardId: string;
+  boardId?: number;
+  onCountChange: (count: number) => void;
+};
+
+function CommentThread({ cardId, boardId, onCountChange }: CommentThreadProps) {
+  const [comments, setComments] = useState<Comment[]>([]);
+  const [newText, setNewText] = useState("");
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    apiListComments(cardId, boardId).then((data) => {
+      setComments(data);
+      onCountChange(data.length);
+      setLoading(false);
+    });
+  }, [cardId, boardId]);
+
+  const handleAdd = async () => {
+    const text = newText.trim();
+    if (!text) return;
+    const comment = await apiCreateComment(cardId, text, boardId);
+    const updated = [...comments, comment];
+    setComments(updated);
+    onCountChange(updated.length);
+    setNewText("");
+  };
+
+  const handleDelete = async (commentId: string) => {
+    await apiDeleteComment(cardId, commentId, boardId);
+    const updated = comments.filter((c) => c.id !== commentId);
+    setComments(updated);
+    onCountChange(updated.length);
+  };
+
+  return (
+    <div className="space-y-2">
+      <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-[var(--gray-text)]">Comments</p>
+      {loading ? (
+        <p className="text-xs text-[var(--gray-text)]">Loading…</p>
+      ) : comments.length === 0 ? (
+        <p className="text-xs text-[var(--gray-text)]">No comments yet</p>
+      ) : (
+        <div className="space-y-2 max-h-[140px] overflow-y-auto">
+          {comments.map((c) => (
+            <div key={c.id} className="group/comment flex items-start gap-2 rounded-xl bg-slate-50 px-3 py-2">
+              <div className="flex-1 min-w-0">
+                <p className="text-[10px] font-semibold text-[var(--navy-dark)]">{c.username}</p>
+                <p className="text-xs text-[var(--gray-text)] mt-0.5 break-words">{c.text}</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => handleDelete(c.id)}
+                className="mt-0.5 opacity-0 group-hover/comment:opacity-100 text-[var(--gray-text)] hover:text-red-500 text-xs transition"
+                aria-label="Delete comment"
+              >
+                ×
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+      <div className="flex gap-1.5">
+        <input
+          value={newText}
+          onChange={(e) => setNewText(e.target.value)}
+          onKeyDown={(e) => { if (e.key === "Enter") handleAdd(); }}
+          placeholder="Add a comment..."
+          className="flex-1 rounded-lg border border-[var(--stroke)] bg-white px-2.5 py-1.5 text-xs outline-none focus:border-[var(--primary-blue)]"
+        />
+        <button
+          type="button"
+          onClick={handleAdd}
+          className="rounded-lg bg-[var(--primary-blue)] px-2.5 py-1.5 text-xs font-semibold text-white disabled:opacity-50"
+          disabled={!newText.trim()}
+        >
+          Post
+        </button>
+      </div>
+    </div>
+  );
+}
+
 type EditModalProps = {
   card: Card;
   labels: Label[];
   boardId?: number;
-  onSave: (title: string, details: string, importance: Importance, dueDate?: string | null, labelIds?: string[], storyPoints?: number | null) => void;
+  onSave: (title: string, details: string, importance: Importance, dueDate?: string | null, labelIds?: string[], storyPoints?: number | null, assignee?: string | null) => void;
   onClose: () => void;
   onLabelsChange: (labels: Label[]) => void;
   onChecklistChange: (items: ChecklistItem[]) => void;
+  onCommentCountChange: (count: number) => void;
 };
 
-function EditModal({ card, labels, boardId, onSave, onClose, onLabelsChange, onChecklistChange }: EditModalProps) {
+function EditModal({ card, labels, boardId, onSave, onClose, onLabelsChange, onChecklistChange, onCommentCountChange }: EditModalProps) {
   const [title, setTitle] = useState(card.title);
   const [details, setDetails] = useState(card.details);
   const [importance, setImportance] = useState<Importance>(card.importance ?? "medium");
   const [dueDate, setDueDate] = useState(card.dueDate ?? "");
   const [selectedLabelIds, setSelectedLabelIds] = useState<string[]>(card.labelIds ?? []);
   const [storyPoints, setStoryPoints] = useState<string>(card.storyPoints != null ? String(card.storyPoints) : "");
+  const [assignee, setAssignee] = useState<string>(card.assignee ?? "");
   const [checklistItems, setChecklistItems] = useState<ChecklistItem[]>(card.checklistItems ?? []);
 
   const handleChecklistChange = (items: ChecklistItem[]) => {
@@ -146,7 +245,7 @@ function EditModal({ card, labels, boardId, onSave, onClose, onLabelsChange, onC
       onClick={onClose}
     >
       <div
-        className="w-[440px] max-h-[90vh] overflow-y-auto rounded-2xl border border-[var(--stroke)] bg-white p-6 shadow-[0_16px_48px_rgba(0,0,0,0.18)]"
+        className="w-[480px] max-h-[90vh] overflow-y-auto rounded-2xl border border-[var(--stroke)] bg-white p-6 shadow-[0_16px_48px_rgba(0,0,0,0.18)]"
         onClick={(e) => e.stopPropagation()}
       >
         <h3 className="mb-4 font-display text-base font-semibold text-[var(--navy-dark)]">Edit card</h3>
@@ -163,6 +262,12 @@ function EditModal({ card, labels, boardId, onSave, onClose, onLabelsChange, onC
             placeholder="Details"
             rows={3}
             className="w-full resize-none rounded-xl border border-[var(--stroke)] bg-white px-3 py-2 text-sm text-[var(--gray-text)] outline-none transition focus:border-[var(--primary-blue)]"
+          />
+          <input
+            value={assignee}
+            onChange={(e) => setAssignee(e.target.value)}
+            placeholder="Assignee (username)"
+            className="w-full rounded-xl border border-[var(--stroke)] bg-white px-3 py-2 text-sm text-[var(--gray-text)] outline-none transition focus:border-[var(--primary-blue)]"
           />
           <div className="flex gap-2">
             {(["low", "medium", "high"] as Importance[]).map((level) => (
@@ -219,6 +324,13 @@ function EditModal({ card, labels, boardId, onSave, onClose, onLabelsChange, onC
             items={checklistItems}
             onChange={handleChecklistChange}
           />
+          <div className="border-t border-[var(--stroke)] pt-3">
+            <CommentThread
+              cardId={card.id}
+              boardId={boardId}
+              onCountChange={onCommentCountChange}
+            />
+          </div>
         </div>
         <div className="mt-4 flex gap-2">
           <button
@@ -230,6 +342,7 @@ function EditModal({ card, labels, boardId, onSave, onClose, onLabelsChange, onC
               dueDate || null,
               selectedLabelIds,
               storyPoints ? parseInt(storyPoints, 10) : null,
+              assignee.trim() || null,
             )}
             className="rounded-full bg-[var(--secondary-purple)] px-4 py-2 text-xs font-semibold uppercase tracking-wide text-white transition hover:brightness-110"
           >
@@ -260,6 +373,7 @@ export const KanbanCard = ({ card, labels, boardId, onDelete, onUpdate, onLabels
   const checklistItems = card.checklistItems ?? [];
   const checklistDone = checklistItems.filter((i) => i.checked).length;
   const checklistTotal = checklistItems.length;
+  const commentCount = card.commentCount ?? 0;
 
   return (
     <>
@@ -268,13 +382,14 @@ export const KanbanCard = ({ card, labels, boardId, onDelete, onUpdate, onLabels
           card={card}
           labels={labels}
           boardId={boardId}
-          onSave={(title, details, imp, dd, labelIds, sp) => {
-            onUpdate(card.id, title, details, imp, dd, labelIds, sp);
+          onSave={(title, details, imp, dd, labelIds, sp, assignee) => {
+            onUpdate(card.id, title, details, imp, dd, labelIds, sp, assignee);
             setEditing(false);
           }}
           onClose={() => setEditing(false)}
           onLabelsChange={onLabelsChange}
           onChecklistChange={(items) => onCardChange({ ...card, checklistItems: items })}
+          onCommentCountChange={(count) => onCardChange({ ...card, commentCount: count })}
         />
       )}
       <article
@@ -341,6 +456,16 @@ export const KanbanCard = ({ card, labels, boardId, onDelete, onUpdate, onLabels
                     : "bg-slate-100 text-slate-500"
                 )}>
                   ✓ {checklistDone}/{checklistTotal}
+                </span>
+              )}
+              {commentCount > 0 && (
+                <span className="flex items-center gap-1 rounded-full bg-blue-50 px-2 py-0.5 text-[9px] font-semibold text-blue-500">
+                  <CommentIcon /> {commentCount}
+                </span>
+              )}
+              {card.assignee && (
+                <span className="rounded-full bg-purple-50 px-2 py-0.5 text-[9px] font-semibold text-purple-600">
+                  @{card.assignee}
                 </span>
               )}
             </div>
