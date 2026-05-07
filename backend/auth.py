@@ -51,7 +51,8 @@ def register(body: RegisterBody):
     existing = db.get_user_by_username(body.username)
     if existing:
         raise HTTPException(status_code=409, detail="Username already taken")
-    db.register_user(body.username, body.password, body.email)
+    user_id = db.register_user(body.username, body.password, body.email)
+    db.create_board(user_id, "My Board")
     return {"ok": True}
 
 
