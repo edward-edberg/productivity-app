@@ -1,7 +1,11 @@
+export type Importance = "low" | "medium" | "high";
+
 export type Card = {
   id: string;
   title: string;
   details: string;
+  importance: Importance;
+  dueDate?: string | null;
 };
 
 export type Column = {
@@ -11,63 +15,55 @@ export type Column = {
 };
 
 export type BoardData = {
+  id: number;
+  name: string;
   columns: Column[];
   cards: Record<string, Card>;
 };
 
+export type BoardSummary = {
+  id: number;
+  name: string;
+  created_at: string;
+};
+
+export const IMPORTANCE_CONFIG: Record<Importance, { label: string; color: string; dot: string }> = {
+  high: {
+    label: "High",
+    color: "text-red-600",
+    dot: "bg-red-500",
+  },
+  medium: {
+    label: "Medium",
+    color: "text-amber-600",
+    dot: "bg-amber-400",
+  },
+  low: {
+    label: "Low",
+    color: "text-slate-400",
+    dot: "bg-slate-300",
+  },
+};
+
 export const initialData: BoardData = {
+  id: 0,
+  name: "My Board",
   columns: [
     { id: "col-backlog", title: "Backlog", cardIds: ["card-1", "card-2"] },
     { id: "col-discovery", title: "Discovery", cardIds: ["card-3"] },
-    {
-      id: "col-progress",
-      title: "In Progress",
-      cardIds: ["card-4", "card-5"],
-    },
+    { id: "col-progress", title: "In Progress", cardIds: ["card-4", "card-5"] },
     { id: "col-review", title: "Review", cardIds: ["card-6"] },
     { id: "col-done", title: "Done", cardIds: ["card-7", "card-8"] },
   ],
   cards: {
-    "card-1": {
-      id: "card-1",
-      title: "Align roadmap themes",
-      details: "Draft quarterly themes with impact statements and metrics.",
-    },
-    "card-2": {
-      id: "card-2",
-      title: "Gather customer signals",
-      details: "Review support tags, sales notes, and churn feedback.",
-    },
-    "card-3": {
-      id: "card-3",
-      title: "Prototype analytics view",
-      details: "Sketch initial dashboard layout and key drill-downs.",
-    },
-    "card-4": {
-      id: "card-4",
-      title: "Refine status language",
-      details: "Standardize column labels and tone across the board.",
-    },
-    "card-5": {
-      id: "card-5",
-      title: "Design card layout",
-      details: "Add hierarchy and spacing for scanning dense lists.",
-    },
-    "card-6": {
-      id: "card-6",
-      title: "QA micro-interactions",
-      details: "Verify hover, focus, and loading states.",
-    },
-    "card-7": {
-      id: "card-7",
-      title: "Ship marketing page",
-      details: "Final copy approved and asset pack delivered.",
-    },
-    "card-8": {
-      id: "card-8",
-      title: "Close onboarding sprint",
-      details: "Document release notes and share internally.",
-    },
+    "card-1": { id: "card-1", title: "Align roadmap themes", details: "Draft quarterly themes with impact statements and metrics.", importance: "medium" },
+    "card-2": { id: "card-2", title: "Gather customer signals", details: "Review support tags, sales notes, and churn feedback.", importance: "low" },
+    "card-3": { id: "card-3", title: "Prototype analytics view", details: "Sketch initial dashboard layout and key drill-downs.", importance: "high" },
+    "card-4": { id: "card-4", title: "Refine status language", details: "Standardize column labels and tone across the board.", importance: "medium" },
+    "card-5": { id: "card-5", title: "Design card layout", details: "Add hierarchy and spacing for scanning dense lists.", importance: "medium" },
+    "card-6": { id: "card-6", title: "QA micro-interactions", details: "Verify hover, focus, and loading states.", importance: "high" },
+    "card-7": { id: "card-7", title: "Ship marketing page", details: "Final copy approved and asset pack delivered.", importance: "low" },
+    "card-8": { id: "card-8", title: "Close onboarding sprint", details: "Document release notes and share internally.", importance: "medium" },
   },
 };
 
@@ -75,68 +71,40 @@ const isColumnId = (columns: Column[], id: string) =>
   columns.some((column) => column.id === id);
 
 const findColumnId = (columns: Column[], id: string) => {
-  if (isColumnId(columns, id)) {
-    return id;
-  }
+  if (isColumnId(columns, id)) return id;
   return columns.find((column) => column.cardIds.includes(id))?.id;
 };
 
-export const moveCard = (
-  columns: Column[],
-  activeId: string,
-  overId: string
-): Column[] => {
+export const moveCard = (columns: Column[], activeId: string, overId: string): Column[] => {
   const activeColumnId = findColumnId(columns, activeId);
   const overColumnId = findColumnId(columns, overId);
 
-  if (!activeColumnId || !overColumnId) {
-    return columns;
-  }
+  if (!activeColumnId || !overColumnId) return columns;
 
-  const activeColumn = columns.find((column) => column.id === activeColumnId);
-  const overColumn = columns.find((column) => column.id === overColumnId);
+  const activeColumn = columns.find((c) => c.id === activeColumnId);
+  const overColumn = columns.find((c) => c.id === overColumnId);
 
-  if (!activeColumn || !overColumn) {
-    return columns;
-  }
+  if (!activeColumn || !overColumn) return columns;
 
   const isOverColumn = isColumnId(columns, overId);
 
   if (activeColumnId === overColumnId) {
     if (isOverColumn) {
-      const nextCardIds = activeColumn.cardIds.filter(
-        (cardId) => cardId !== activeId
-      );
+      const nextCardIds = activeColumn.cardIds.filter((id) => id !== activeId);
       nextCardIds.push(activeId);
-      return columns.map((column) =>
-        column.id === activeColumnId
-          ? { ...column, cardIds: nextCardIds }
-          : column
-      );
+      return columns.map((c) => (c.id === activeColumnId ? { ...c, cardIds: nextCardIds } : c));
     }
-
     const oldIndex = activeColumn.cardIds.indexOf(activeId);
     const newIndex = activeColumn.cardIds.indexOf(overId);
-
-    if (oldIndex === -1 || newIndex === -1 || oldIndex === newIndex) {
-      return columns;
-    }
-
+    if (oldIndex === -1 || newIndex === -1 || oldIndex === newIndex) return columns;
     const nextCardIds = [...activeColumn.cardIds];
     nextCardIds.splice(oldIndex, 1);
     nextCardIds.splice(newIndex, 0, activeId);
-
-    return columns.map((column) =>
-      column.id === activeColumnId
-        ? { ...column, cardIds: nextCardIds }
-        : column
-    );
+    return columns.map((c) => (c.id === activeColumnId ? { ...c, cardIds: nextCardIds } : c));
   }
 
   const activeIndex = activeColumn.cardIds.indexOf(activeId);
-  if (activeIndex === -1) {
-    return columns;
-  }
+  if (activeIndex === -1) return columns;
 
   const nextActiveCardIds = [...activeColumn.cardIds];
   nextActiveCardIds.splice(activeIndex, 1);
@@ -150,14 +118,10 @@ export const moveCard = (
     nextOverCardIds.splice(insertIndex, 0, activeId);
   }
 
-  return columns.map((column) => {
-    if (column.id === activeColumnId) {
-      return { ...column, cardIds: nextActiveCardIds };
-    }
-    if (column.id === overColumnId) {
-      return { ...column, cardIds: nextOverCardIds };
-    }
-    return column;
+  return columns.map((c) => {
+    if (c.id === activeColumnId) return { ...c, cardIds: nextActiveCardIds };
+    if (c.id === overColumnId) return { ...c, cardIds: nextOverCardIds };
+    return c;
   });
 };
 
@@ -166,3 +130,14 @@ export const createId = (prefix: string) => {
   const timePart = Date.now().toString(36);
   return `${prefix}-${randomPart}${timePart}`;
 };
+
+export function isOverdue(dueDate: string | null | undefined): boolean {
+  if (!dueDate) return false;
+  return new Date(dueDate) < new Date(new Date().toDateString());
+}
+
+export function formatDueDate(dueDate: string | null | undefined): string {
+  if (!dueDate) return "";
+  const d = new Date(dueDate);
+  return d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+}

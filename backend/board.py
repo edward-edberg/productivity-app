@@ -1,17 +1,25 @@
-from fastapi import APIRouter, Cookie, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 
 import database as db
-from auth import SESSION_TOKEN, VALID_TOKEN
+from auth import require_user_id
 
 router = APIRouter(prefix="/api")
 
 
-def require_board_id(session: str | None = Cookie(default=None)) -> int:
-    if session != VALID_TOKEN:
-        raise HTTPException(status_code=401, detail="Not authenticated")
-    user_id = db.get_or_create_user("user")
+def require_board_id(
+    board_id: int | None = Query(default=None, alias="boardId"),
+    user_id: int = Depends(require_user_id),
+) -> int:
+    if board_id is not None:
+        if not db.board_belongs_to_user(board_id, user_id):
+            raise HTTPException(status_code=403, detail="Board not found")
+        return board_id
     return db.get_or_create_board(user_id)
+
+
+class RenameBoardBody(BaseModel):
+    name: str
 
 
 class RenameColumnBody(BaseModel):
@@ -22,17 +30,55 @@ class CreateCardBody(BaseModel):
     columnId: str
     title: str
     details: str = ""
+    importance: str = "medium"
+    dueDate: str | None = None
 
 
 class UpdateCardBody(BaseModel):
     title: str
     details: str
+    importance: str = "medium"
+    dueDate: str | None = None
 
 
 class MoveCardBody(BaseModel):
     columnId: str
     position: int
 
+
+# ─── Board management ──────────────────────────────────────────────────────────
+
+@router.get("/boards")
+def list_boards(user_id: int = Depends(require_user_id)):
+    return db.list_boards(user_id)
+
+
+@router.post("/boards")
+def create_board(body: RenameBoardBody, user_id: int = Depends(require_user_id)):
+    board_id = db.create_board(user_id, body.name)
+    return {"id": board_id, "name": body.name}
+
+
+@router.put("/boards/{bid}")
+def rename_board(bid: int, body: RenameBoardBody, user_id: int = Depends(require_user_id)):
+    if not db.board_belongs_to_user(bid, user_id):
+        raise HTTPException(status_code=403, detail="Board not found")
+    db.rename_board(bid, body.name)
+    return {"ok": True}
+
+
+@router.delete("/boards/{bid}")
+def delete_board(bid: int, user_id: int = Depends(require_user_id)):
+    if not db.board_belongs_to_user(bid, user_id):
+        raise HTTPException(status_code=403, detail="Board not found")
+    boards = db.list_boards(user_id)
+    if len(boards) <= 1:
+        raise HTTPException(status_code=400, detail="Cannot delete your only board")
+    db.delete_board(bid)
+    return {"ok": True}
+
+
+# ─── Board data ────────────────────────────────────────────────────────────────
 
 @router.get("/board")
 def get_board(board_id: int = Depends(require_board_id)):
@@ -47,13 +93,13 @@ def rename_column(column_id: str, body: RenameColumnBody, board_id: int = Depend
 
 @router.post("/cards")
 def create_card(body: CreateCardBody, board_id: int = Depends(require_board_id)):
-    card = db.create_card(body.columnId, body.title, body.details)
+    card = db.create_card(body.columnId, body.title, body.details, body.importance, body.dueDate)
     return card
 
 
 @router.put("/cards/{card_id}")
 def update_card(card_id: str, body: UpdateCardBody, board_id: int = Depends(require_board_id)):
-    db.update_card(card_id, body.title, body.details)
+    db.update_card(card_id, body.title, body.details, body.importance, body.dueDate)
     return {"ok": True}
 
 

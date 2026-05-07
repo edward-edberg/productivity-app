@@ -6,7 +6,6 @@ from fastapi import APIRouter, Cookie, Depends, HTTPException
 from pydantic import BaseModel
 
 import database as db
-from auth import SESSION_TOKEN, VALID_TOKEN
 from board import require_board_id
 
 router = APIRouter(prefix="/api/ai")
@@ -44,6 +43,8 @@ RESPOND_TOOL = {
                                 "id": {"type": "string"},
                                 "title": {"type": "string"},
                                 "details": {"type": "string"},
+                                "importance": {"type": "string", "enum": ["low", "medium", "high"]},
+                                "dueDate": {"type": "string"},
                             },
                             "required": ["id", "title", "details"],
                         },

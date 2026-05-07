@@ -11,8 +11,9 @@ export type ChatResponse = {
   board: BoardData;
 };
 
-export async function sendChat(messages: ChatMessage[]): Promise<ChatResponse> {
-  const res = await fetch("/api/ai/chat", {
+export async function sendChat(messages: ChatMessage[], boardId?: number): Promise<ChatResponse> {
+  const param = boardId !== undefined ? `?boardId=${boardId}` : "";
+  const res = await fetch(`/api/ai/chat${param}`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ messages }),

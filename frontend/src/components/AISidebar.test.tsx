@@ -3,6 +3,8 @@ import userEvent from "@testing-library/user-event";
 import { AISidebar } from "@/components/AISidebar";
 
 const mockBoard = {
+  id: 1,
+  name: "My Board",
   columns: [
     { id: "col-backlog", title: "Backlog", cardIds: [] },
     { id: "col-discovery", title: "Discovery", cardIds: [] },
@@ -79,7 +81,7 @@ describe("AISidebar", () => {
   });
 
   it("calls onBoardUpdate when board_update is present", async () => {
-    const updatedBoard = { ...mockBoard, cards: { "card-1": { id: "card-1", title: "New", details: "" } } };
+    const updatedBoard = { ...mockBoard, cards: { "card-1": { id: "card-1", title: "New", details: "", importance: "medium" as const, dueDate: null } } };
     mockSendChat.mockResolvedValue({
       response: "Added a card.",
       board_update: updatedBoard,

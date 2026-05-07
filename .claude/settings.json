@@ -20,7 +20,9 @@
       "Bash(npm info *)",
       "Bash(npx tsc --noEmit *)",
       "Bash(uv sync *)",
-      "Bash(curl -s http://localhost:*)"
+      "Bash(curl -s http://localhost:*)",
+      "Bash(/Users/edwardedberg/.claude/plugins/cache/claude-plugins-official/ralph-loop/1.0.0/scripts/setup-ralph-loop.sh:*)"
+
     ]
   }
 }

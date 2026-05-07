@@ -5,10 +5,11 @@ import type { BoardData } from "@/lib/kanban";
 import { sendChat, type ChatMessage } from "@/lib/chat";
 
 type AISidebarProps = {
+  boardId?: number;
   onBoardUpdate: (board: BoardData) => void;
 };
 
-export const AISidebar = ({ onBoardUpdate }: AISidebarProps) => {
+export const AISidebar = ({ boardId, onBoardUpdate }: AISidebarProps) => {
   const [open, setOpen] = useState(false);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
@@ -35,7 +36,7 @@ export const AISidebar = ({ onBoardUpdate }: AISidebarProps) => {
     setLoading(true);
 
     try {
-      const result = await sendChat(next);
+      const result = await sendChat(next, boardId);
       setMessages([...next, { role: "assistant", content: result.response }]);
       if (result.board_update) {
         onBoardUpdate(result.board);
@@ -78,7 +79,7 @@ export const AISidebar = ({ onBoardUpdate }: AISidebarProps) => {
           <div className="flex max-h-72 flex-col gap-2.5 overflow-y-auto px-4 py-3">
             {messages.length === 0 && (
               <p className="text-center text-xs leading-5 text-[var(--gray-text)]">
-                Ask me to add, move, or remove cards — e.g. "Add a card called Deploy to Done."
+                Ask me to add, move, or remove cards — e.g. &ldquo;Add a card called Deploy to Done.&rdquo;
               </p>
             )}
             {messages.map((msg, i) => (

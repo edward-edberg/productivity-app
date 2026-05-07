@@ -32,3 +32,21 @@ body {
 .font-display {
   font-family: var(--font-display), "Segoe UI", sans-serif;
 }
+
+.board-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(3, 33, 71, 0.12) transparent;
+}
+.board-scroll::-webkit-scrollbar {
+  height: 5px;
+}
+.board-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+.board-scroll::-webkit-scrollbar-thumb {
+  background: rgba(3, 33, 71, 0.12);
+  border-radius: 3px;
+}
+.board-scroll::-webkit-scrollbar-thumb:hover {
+  background: rgba(3, 33, 71, 0.22);
+}

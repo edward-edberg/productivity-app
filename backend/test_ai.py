@@ -56,13 +56,18 @@ def test_ai_chat_no_board_update(client, monkeypatch):
 
 def test_ai_chat_with_board_update(client, monkeypatch):
     monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
+
+    # Fetch the real column IDs (they now include board_id suffix)
+    board = client.get("/api/board").json()
+    cols = {c["title"]: c["id"] for c in board["columns"]}
+
     board_update = {
         "columns": [
-            {"id": "col-backlog", "title": "Backlog", "cardIds": ["card-abc123"]},
-            {"id": "col-discovery", "title": "Discovery", "cardIds": []},
-            {"id": "col-progress", "title": "In Progress", "cardIds": []},
-            {"id": "col-review", "title": "Review", "cardIds": []},
-            {"id": "col-done", "title": "Done", "cardIds": []},
+            {"id": cols["Backlog"], "title": "Backlog", "cardIds": ["card-abc123"]},
+            {"id": cols["Discovery"], "title": "Discovery", "cardIds": []},
+            {"id": cols["In Progress"], "title": "In Progress", "cardIds": []},
+            {"id": cols["Review"], "title": "Review", "cardIds": []},
+            {"id": cols["Done"], "title": "Done", "cardIds": []},
         ],
         "cards": {
             "card-abc123": {"id": "card-abc123", "title": "New task", "details": "From AI"},

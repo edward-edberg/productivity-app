@@ -2,7 +2,11 @@ import { render, screen, within, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { KanbanBoard } from "@/components/KanbanBoard";
 
+const mockUser = { id: 1, username: "testuser", email: "" };
+
 const mockBoard = {
+  id: 1,
+  name: "My Board",
   columns: [
     { id: "col-backlog", title: "Backlog", cardIds: [] },
     { id: "col-discovery", title: "Discovery", cardIds: [] },
@@ -13,14 +17,18 @@ const mockBoard = {
   cards: {},
 };
 
+const mockBoards = [{ id: 1, name: "My Board", created_at: "2026-01-01" }];
+
 vi.mock("@/lib/api", () => ({
   fetchBoard: vi.fn(),
+  fetchBoards: vi.fn(),
   apiRenameColumn: vi.fn().mockResolvedValue(undefined),
   apiCreateCard: vi.fn().mockImplementation((_colId: string, title: string, details: string) =>
-    Promise.resolve({ id: "card-new", title, details })
+    Promise.resolve({ id: "card-new", title, details, importance: "medium", dueDate: null })
   ),
   apiDeleteCard: vi.fn().mockResolvedValue(undefined),
   apiMoveCard: vi.fn().mockResolvedValue(undefined),
+  apiUpdateCard: vi.fn().mockResolvedValue(undefined),
 }));
 
 vi.mock("@/lib/auth", () => ({ logout: vi.fn() }));
@@ -29,23 +37,25 @@ vi.mock("@/components/AISidebar", () => ({
   AISidebar: () => <div data-testid="ai-sidebar-mock" />,
 }));
 
-import { fetchBoard } from "@/lib/api";
+import { fetchBoard, fetchBoards } from "@/lib/api";
 const mockFetchBoard = fetchBoard as ReturnType<typeof vi.fn>;
+const mockFetchBoards = fetchBoards as ReturnType<typeof vi.fn>;
 
 beforeEach(() => {
   mockFetchBoard.mockResolvedValue(structuredClone(mockBoard));
+  mockFetchBoards.mockResolvedValue(mockBoards);
 });
 
 const getFirstColumn = () => screen.getAllByTestId(/column-/i)[0];
 
 describe("KanbanBoard", () => {
   it("renders five columns after loading", async () => {
-    render(<KanbanBoard onLogout={() => {}} />);
+    render(<KanbanBoard user={mockUser} onLogout={() => {}} />);
     await waitFor(() => expect(screen.getAllByTestId(/column-/i)).toHaveLength(5));
   });
 
   it("renames a column", async () => {
-    render(<KanbanBoard onLogout={() => {}} />);
+    render(<KanbanBoard user={mockUser} onLogout={() => {}} />);
     await waitFor(() => screen.getAllByTestId(/column-/i));
     const column = getFirstColumn();
     const input = within(column).getByLabelText("Column title");
@@ -55,7 +65,7 @@ describe("KanbanBoard", () => {
   });
 
   it("adds and removes a card", async () => {
-    render(<KanbanBoard onLogout={() => {}} />);
+    render(<KanbanBoard user={mockUser} onLogout={() => {}} />);
     await waitFor(() => screen.getAllByTestId(/column-/i));
     const column = getFirstColumn();
     await userEvent.click(within(column).getByRole("button", { name: /add a card/i }));
@@ -66,5 +76,11 @@ describe("KanbanBoard", () => {
 
     await userEvent.click(within(column).getByRole("button", { name: /delete new card/i }));
     expect(within(column).queryByText("New card")).not.toBeInTheDocument();
+  });
+
+  it("shows the board name in the header", async () => {
+    render(<KanbanBoard user={mockUser} onLogout={() => {}} />);
+    await waitFor(() => screen.getAllByText("My Board"));
+    expect(screen.getAllByText("My Board").length).toBeGreaterThanOrEqual(1);
   });
 });

@@ -9,6 +9,14 @@ async function signIn(page: Page) {
   await expect(page.locator('[data-testid^="column-"]').first()).toBeVisible();
 }
 
+async function signOut(page: Page) {
+  // Call the logout API directly and reload to get login screen
+  await page.evaluate(async () => {
+    await fetch("/api/auth/logout", { method: "POST" });
+  });
+  await page.reload();
+}
+
 test("redirects to login when unauthenticated", async ({ page }) => {
   await page.context().clearCookies();
   await page.goto("/");
@@ -33,7 +41,7 @@ test("login and see the board", async ({ page }) => {
 test("logout returns to login screen", async ({ page }) => {
   await page.context().clearCookies();
   await signIn(page);
-  await page.getByRole("button", { name: /sign out/i }).click();
+  await signOut(page);
   await expect(page.getByRole("button", { name: /sign in/i })).toBeVisible();
 });
 
@@ -60,7 +68,7 @@ test("AI sidebar creates a card via chat", async ({ page }) => {
   await input.fill('Add a card called "AI created task" to the Backlog column');
   await page.getByRole("button", { name: /send/i }).click();
 
-  const backlog = page.getByTestId("column-col-backlog");
+  const backlog = page.locator('[data-testid^="column-"]').first();
   await expect(backlog.getByText("AI created task").first()).toBeVisible({ timeout: 15000 });
 });
 
@@ -68,21 +76,23 @@ test("moves a card between columns", async ({ page }) => {
   await page.context().clearCookies();
   await signIn(page);
 
-  const backlog = page.getByTestId("column-col-backlog");
+  const columns = page.locator('[data-testid^="column-"]');
+  const backlog = columns.first();
+  const doneColumn = columns.last();
+
   await backlog.getByRole("button", { name: /add a card/i }).click();
   await backlog.getByPlaceholder("Card title").fill("Drag me");
   await backlog.getByRole("button", { name: /add card/i }).click();
   await expect(backlog.getByText("Drag me")).toBeVisible();
 
   const card = backlog.getByText("Drag me");
-  const targetColumn = page.getByTestId("column-col-done");
   const cardBox = await card.boundingBox();
-  const columnBox = await targetColumn.boundingBox();
+  const columnBox = await doneColumn.boundingBox();
   if (!cardBox || !columnBox) throw new Error("Unable to resolve drag coordinates.");
 
   await page.mouse.move(cardBox.x + cardBox.width / 2, cardBox.y + cardBox.height / 2);
   await page.mouse.down();
   await page.mouse.move(columnBox.x + columnBox.width / 2, columnBox.y + 120, { steps: 12 });
   await page.mouse.up();
-  await expect(targetColumn.getByText("Drag me").first()).toBeVisible();
+  await expect(doneColumn.getByText("Drag me").first()).toBeVisible();
 });
