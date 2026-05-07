@@ -37,6 +37,7 @@ class CreateCardBody(BaseModel):
     importance: str = "medium"
     dueDate: str | None = None
     labelIds: list[str] = []
+    storyPoints: int | None = None
 
 
 class UpdateCardBody(BaseModel):
@@ -45,6 +46,20 @@ class UpdateCardBody(BaseModel):
     importance: str = "medium"
     dueDate: str | None = None
     labelIds: list[str] | None = None
+    storyPoints: int | None = None
+
+
+class SetWipLimitBody(BaseModel):
+    wipLimit: int | None = None
+
+
+class CreateChecklistItemBody(BaseModel):
+    text: str
+
+
+class UpdateChecklistItemBody(BaseModel):
+    text: str
+    checked: bool
 
 
 class MoveCardBody(BaseModel):
@@ -119,6 +134,12 @@ def rename_column(column_id: str, body: RenameColumnBody, board_id: int = Depend
     return {"ok": True}
 
 
+@router.put("/columns/{column_id}/wip-limit")
+def set_wip_limit(column_id: str, body: SetWipLimitBody, board_id: int = Depends(require_board_id)):
+    db.set_column_wip_limit(column_id, body.wipLimit)
+    return {"ok": True}
+
+
 @router.delete("/columns/{column_id}")
 def delete_column(column_id: str, board_id: int = Depends(require_board_id)):
     board = db.get_board_data(board_id)
@@ -165,7 +186,7 @@ def set_card_labels(card_id: str, body: SetCardLabelsBody, board_id: int = Depen
 def create_card(body: CreateCardBody, board_id: int = Depends(require_board_id)):
     card = db.create_card(
         body.columnId, body.title, body.details,
-        body.importance, body.dueDate, body.labelIds,
+        body.importance, body.dueDate, body.labelIds, body.storyPoints,
     )
     return card
 
@@ -174,8 +195,32 @@ def create_card(body: CreateCardBody, board_id: int = Depends(require_board_id))
 def update_card(card_id: str, body: UpdateCardBody, board_id: int = Depends(require_board_id)):
     db.update_card(
         card_id, body.title, body.details,
-        body.importance, body.dueDate, body.labelIds,
+        body.importance, body.dueDate, body.labelIds, body.storyPoints,
     )
+    return {"ok": True}
+
+
+# ─── Checklist endpoints ───────────────────────────────────────────────────────
+
+@router.get("/cards/{card_id}/checklist")
+def list_checklist(card_id: str, board_id: int = Depends(require_board_id)):
+    return db.list_checklist_items(card_id)
+
+
+@router.post("/cards/{card_id}/checklist")
+def add_checklist_item(card_id: str, body: CreateChecklistItemBody, board_id: int = Depends(require_board_id)):
+    return db.create_checklist_item(card_id, body.text)
+
+
+@router.put("/cards/{card_id}/checklist/{item_id}")
+def update_checklist_item(card_id: str, item_id: str, body: UpdateChecklistItemBody, board_id: int = Depends(require_board_id)):
+    db.update_checklist_item(item_id, body.text, body.checked)
+    return {"ok": True}
+
+
+@router.delete("/cards/{card_id}/checklist/{item_id}")
+def delete_checklist_item(card_id: str, item_id: str, board_id: int = Depends(require_board_id)):
+    db.delete_checklist_item(item_id)
     return {"ok": True}
 
 

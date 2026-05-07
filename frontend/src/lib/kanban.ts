@@ -6,6 +6,12 @@ export type Label = {
   color: string;
 };
 
+export type ChecklistItem = {
+  id: string;
+  text: string;
+  checked: boolean;
+};
+
 export type Card = {
   id: string;
   title: string;
@@ -13,12 +19,15 @@ export type Card = {
   importance: Importance;
   dueDate?: string | null;
   labelIds: string[];
+  storyPoints?: number | null;
+  checklistItems?: ChecklistItem[];
 };
 
 export type Column = {
   id: string;
   title: string;
   cardIds: string[];
+  wipLimit?: number | null;
 };
 
 export type BoardData = {
@@ -64,14 +73,14 @@ export const initialData: BoardData = {
     { id: "col-done", title: "Done", cardIds: ["card-7", "card-8"] },
   ],
   cards: {
-    "card-1": { id: "card-1", title: "Align roadmap themes", details: "Draft quarterly themes.", importance: "medium", labelIds: [] },
-    "card-2": { id: "card-2", title: "Gather customer signals", details: "Review support tags.", importance: "low", labelIds: [] },
-    "card-3": { id: "card-3", title: "Prototype analytics view", details: "Sketch dashboard.", importance: "high", labelIds: [] },
-    "card-4": { id: "card-4", title: "Refine status language", details: "Standardize labels.", importance: "medium", labelIds: [] },
-    "card-5": { id: "card-5", title: "Design card layout", details: "Add hierarchy.", importance: "medium", labelIds: [] },
-    "card-6": { id: "card-6", title: "QA micro-interactions", details: "Verify hover states.", importance: "high", labelIds: [] },
-    "card-7": { id: "card-7", title: "Ship marketing page", details: "Final copy approved.", importance: "low", labelIds: [] },
-    "card-8": { id: "card-8", title: "Close onboarding sprint", details: "Document release notes.", importance: "medium", labelIds: [] },
+    "card-1": { id: "card-1", title: "Align roadmap themes", details: "Draft quarterly themes.", importance: "medium", labelIds: [], checklistItems: [] },
+    "card-2": { id: "card-2", title: "Gather customer signals", details: "Review support tags.", importance: "low", labelIds: [], checklistItems: [] },
+    "card-3": { id: "card-3", title: "Prototype analytics view", details: "Sketch dashboard.", importance: "high", labelIds: [], checklistItems: [] },
+    "card-4": { id: "card-4", title: "Refine status language", details: "Standardize labels.", importance: "medium", labelIds: [], checklistItems: [] },
+    "card-5": { id: "card-5", title: "Design card layout", details: "Add hierarchy.", importance: "medium", labelIds: [], checklistItems: [] },
+    "card-6": { id: "card-6", title: "QA micro-interactions", details: "Verify hover states.", importance: "high", labelIds: [], checklistItems: [] },
+    "card-7": { id: "card-7", title: "Ship marketing page", details: "Final copy approved.", importance: "low", labelIds: [], checklistItems: [] },
+    "card-8": { id: "card-8", title: "Close onboarding sprint", details: "Document release notes.", importance: "medium", labelIds: [], checklistItems: [] },
   },
   labels: [],
 };

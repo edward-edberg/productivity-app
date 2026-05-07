@@ -8,11 +8,11 @@ const mockBoard = {
   id: 1,
   name: "My Board",
   columns: [
-    { id: "col-backlog", title: "Backlog", cardIds: [] },
-    { id: "col-discovery", title: "Discovery", cardIds: [] },
-    { id: "col-progress", title: "In Progress", cardIds: [] },
-    { id: "col-review", title: "Review", cardIds: [] },
-    { id: "col-done", title: "Done", cardIds: [] },
+    { id: "col-backlog", title: "Backlog", cardIds: [], wipLimit: null },
+    { id: "col-discovery", title: "Discovery", cardIds: [], wipLimit: null },
+    { id: "col-progress", title: "In Progress", cardIds: [], wipLimit: null },
+    { id: "col-review", title: "Review", cardIds: [], wipLimit: null },
+    { id: "col-done", title: "Done", cardIds: [], wipLimit: null },
   ],
   cards: {},
   labels: [],
@@ -27,11 +27,15 @@ vi.mock("@/lib/api", () => ({
   apiCreateColumn: vi.fn().mockResolvedValue({ id: "col-new", title: "New Column", cardIds: [] }),
   apiDeleteColumn: vi.fn().mockResolvedValue(undefined),
   apiCreateCard: vi.fn().mockImplementation((_colId: string, title: string, details: string) =>
-    Promise.resolve({ id: "card-new", title, details, importance: "medium", dueDate: null, labelIds: [] })
+    Promise.resolve({ id: "card-new", title, details, importance: "medium", dueDate: null, labelIds: [], checklistItems: [], storyPoints: null })
   ),
   apiDeleteCard: vi.fn().mockResolvedValue(undefined),
   apiMoveCard: vi.fn().mockResolvedValue(undefined),
   apiUpdateCard: vi.fn().mockResolvedValue(undefined),
+  apiSetWipLimit: vi.fn().mockResolvedValue(undefined),
+  apiAddChecklistItem: vi.fn().mockResolvedValue({ id: "chk-1", text: "test", checked: false }),
+  apiUpdateChecklistItem: vi.fn().mockResolvedValue(undefined),
+  apiDeleteChecklistItem: vi.fn().mockResolvedValue(undefined),
 }));
 
 vi.mock("@/lib/auth", () => ({ logout: vi.fn() }));

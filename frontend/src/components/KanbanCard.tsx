@@ -4,17 +4,19 @@ import { useState } from "react";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import clsx from "clsx";
-import type { Card, Importance, Label } from "@/lib/kanban";
+import type { Card, ChecklistItem, Importance, Label } from "@/lib/kanban";
 import { IMPORTANCE_CONFIG, isOverdue, formatDueDate } from "@/lib/kanban";
 import { LabelPicker } from "@/components/LabelPicker";
+import { apiAddChecklistItem, apiUpdateChecklistItem, apiDeleteChecklistItem } from "@/lib/api";
 
 type KanbanCardProps = {
   card: Card;
   labels: Label[];
   boardId?: number;
   onDelete: (cardId: string) => void;
-  onUpdate: (cardId: string, title: string, details: string, importance: Importance, dueDate?: string | null, labelIds?: string[]) => void;
+  onUpdate: (cardId: string, title: string, details: string, importance: Importance, dueDate?: string | null, labelIds?: string[], storyPoints?: number | null) => void;
   onLabelsChange: (labels: Label[]) => void;
+  onCardChange: (card: Card) => void;
 };
 
 const TrashIcon = () => (
@@ -29,21 +31,114 @@ const EditIcon = () => (
   </svg>
 );
 
+type ChecklistEditorProps = {
+  cardId: string;
+  boardId?: number;
+  items: ChecklistItem[];
+  onChange: (items: ChecklistItem[]) => void;
+};
+
+function ChecklistEditor({ cardId, boardId, items, onChange }: ChecklistEditorProps) {
+  const [newText, setNewText] = useState("");
+
+  const handleAdd = async () => {
+    const text = newText.trim();
+    if (!text) return;
+    const item = await apiAddChecklistItem(cardId, text, boardId);
+    onChange([...items, item]);
+    setNewText("");
+  };
+
+  const handleToggle = async (item: ChecklistItem) => {
+    const updated = { ...item, checked: !item.checked };
+    onChange(items.map((i) => (i.id === item.id ? updated : i)));
+    await apiUpdateChecklistItem(cardId, item.id, item.text, !item.checked, boardId);
+  };
+
+  const handleDelete = async (itemId: string) => {
+    onChange(items.filter((i) => i.id !== itemId));
+    await apiDeleteChecklistItem(cardId, itemId, boardId);
+  };
+
+  const handleUpdateText = async (item: ChecklistItem, text: string) => {
+    if (!text.trim()) return;
+    onChange(items.map((i) => (i.id === item.id ? { ...i, text } : i)));
+    await apiUpdateChecklistItem(cardId, item.id, text, item.checked, boardId);
+  };
+
+  return (
+    <div className="space-y-1.5">
+      <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-[var(--gray-text)]">Checklist</p>
+      {items.map((item) => (
+        <div key={item.id} className="group/item flex items-center gap-2">
+          <input
+            type="checkbox"
+            checked={item.checked}
+            onChange={() => handleToggle(item)}
+            className="h-3.5 w-3.5 flex-shrink-0 cursor-pointer rounded accent-[var(--secondary-purple)]"
+          />
+          <input
+            defaultValue={item.text}
+            onBlur={(e) => handleUpdateText(item, e.target.value)}
+            className={clsx(
+              "flex-1 bg-transparent text-xs outline-none",
+              item.checked ? "line-through text-[var(--gray-text)]" : "text-[var(--navy-dark)]"
+            )}
+          />
+          <button
+            type="button"
+            onClick={() => handleDelete(item.id)}
+            className="opacity-0 group-hover/item:opacity-100 text-[var(--gray-text)] hover:text-red-500 text-xs leading-none transition"
+            aria-label="Delete checklist item"
+          >
+            ×
+          </button>
+        </div>
+      ))}
+      <div className="flex gap-1.5">
+        <input
+          value={newText}
+          onChange={(e) => setNewText(e.target.value)}
+          onKeyDown={(e) => { if (e.key === "Enter") handleAdd(); }}
+          placeholder="Add item..."
+          className="flex-1 rounded-lg border border-[var(--stroke)] bg-white px-2.5 py-1.5 text-xs outline-none focus:border-[var(--primary-blue)]"
+        />
+        <button
+          type="button"
+          onClick={handleAdd}
+          className="rounded-lg bg-[var(--secondary-purple)] px-2.5 py-1.5 text-xs font-semibold text-white disabled:opacity-50"
+          disabled={!newText.trim()}
+        >
+          Add
+        </button>
+      </div>
+    </div>
+  );
+}
+
 type EditModalProps = {
   card: Card;
   labels: Label[];
   boardId?: number;
-  onSave: (title: string, details: string, importance: Importance, dueDate?: string | null, labelIds?: string[]) => void;
+  onSave: (title: string, details: string, importance: Importance, dueDate?: string | null, labelIds?: string[], storyPoints?: number | null) => void;
   onClose: () => void;
   onLabelsChange: (labels: Label[]) => void;
+  onChecklistChange: (items: ChecklistItem[]) => void;
 };
 
-function EditModal({ card, labels, boardId, onSave, onClose, onLabelsChange }: EditModalProps) {
+function EditModal({ card, labels, boardId, onSave, onClose, onLabelsChange, onChecklistChange }: EditModalProps) {
   const [title, setTitle] = useState(card.title);
   const [details, setDetails] = useState(card.details);
   const [importance, setImportance] = useState<Importance>(card.importance ?? "medium");
   const [dueDate, setDueDate] = useState(card.dueDate ?? "");
   const [selectedLabelIds, setSelectedLabelIds] = useState<string[]>(card.labelIds ?? []);
+  const [storyPoints, setStoryPoints] = useState<string>(card.storyPoints != null ? String(card.storyPoints) : "");
+  const [checklistItems, setChecklistItems] = useState<ChecklistItem[]>(card.checklistItems ?? []);
+
+  const handleChecklistChange = (items: ChecklistItem[]) => {
+    setChecklistItems(items);
+    onChecklistChange(items);
+  };
 
   return (
     <div
@@ -51,7 +146,7 @@ function EditModal({ card, labels, boardId, onSave, onClose, onLabelsChange }: E
       onClick={onClose}
     >
       <div
-        className="w-[400px] max-h-[90vh] overflow-y-auto rounded-2xl border border-[var(--stroke)] bg-white p-6 shadow-[0_16px_48px_rgba(0,0,0,0.18)]"
+        className="w-[440px] max-h-[90vh] overflow-y-auto rounded-2xl border border-[var(--stroke)] bg-white p-6 shadow-[0_16px_48px_rgba(0,0,0,0.18)]"
         onClick={(e) => e.stopPropagation()}
       >
         <h3 className="mb-4 font-display text-base font-semibold text-[var(--navy-dark)]">Edit card</h3>
@@ -91,12 +186,26 @@ function EditModal({ card, labels, boardId, onSave, onClose, onLabelsChange }: E
               </button>
             ))}
           </div>
-          <input
-            type="date"
-            value={dueDate}
-            onChange={(e) => setDueDate(e.target.value)}
-            className="w-full rounded-xl border border-[var(--stroke)] bg-white px-3 py-2 text-sm text-[var(--gray-text)] outline-none transition focus:border-[var(--primary-blue)]"
-          />
+          <div className="flex gap-2">
+            <input
+              type="date"
+              value={dueDate}
+              onChange={(e) => setDueDate(e.target.value)}
+              className="flex-1 rounded-xl border border-[var(--stroke)] bg-white px-3 py-2 text-sm text-[var(--gray-text)] outline-none transition focus:border-[var(--primary-blue)]"
+            />
+            <div className="relative flex items-center">
+              <input
+                type="number"
+                min={1}
+                max={999}
+                value={storyPoints}
+                onChange={(e) => setStoryPoints(e.target.value)}
+                placeholder="SP"
+                className="w-20 rounded-xl border border-[var(--stroke)] bg-white px-3 py-2 text-sm text-[var(--gray-text)] outline-none transition focus:border-[var(--primary-blue)]"
+              />
+              <span className="pointer-events-none absolute right-3 text-[10px] text-[var(--gray-text)]">pts</span>
+            </div>
+          </div>
           <LabelPicker
             labels={labels}
             selectedIds={selectedLabelIds}
@@ -104,11 +213,24 @@ function EditModal({ card, labels, boardId, onSave, onClose, onLabelsChange }: E
             onChange={setSelectedLabelIds}
             onLabelsChange={onLabelsChange}
           />
+          <ChecklistEditor
+            cardId={card.id}
+            boardId={boardId}
+            items={checklistItems}
+            onChange={handleChecklistChange}
+          />
         </div>
         <div className="mt-4 flex gap-2">
           <button
             type="button"
-            onClick={() => onSave(title.trim(), details.trim(), importance, dueDate || null, selectedLabelIds)}
+            onClick={() => onSave(
+              title.trim(),
+              details.trim(),
+              importance,
+              dueDate || null,
+              selectedLabelIds,
+              storyPoints ? parseInt(storyPoints, 10) : null,
+            )}
             className="rounded-full bg-[var(--secondary-purple)] px-4 py-2 text-xs font-semibold uppercase tracking-wide text-white transition hover:brightness-110"
           >
             Save
@@ -126,7 +248,7 @@ function EditModal({ card, labels, boardId, onSave, onClose, onLabelsChange }: E
   );
 }
 
-export const KanbanCard = ({ card, labels, boardId, onDelete, onUpdate, onLabelsChange }: KanbanCardProps) => {
+export const KanbanCard = ({ card, labels, boardId, onDelete, onUpdate, onLabelsChange, onCardChange }: KanbanCardProps) => {
   const [editing, setEditing] = useState(false);
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
     useSortable({ id: card.id });
@@ -135,6 +257,9 @@ export const KanbanCard = ({ card, labels, boardId, onDelete, onUpdate, onLabels
   const importance = card.importance ?? "medium";
   const overdue = isOverdue(card.dueDate);
   const cardLabels = (card.labelIds ?? []).map((id) => labels.find((l) => l.id === id)).filter(Boolean) as Label[];
+  const checklistItems = card.checklistItems ?? [];
+  const checklistDone = checklistItems.filter((i) => i.checked).length;
+  const checklistTotal = checklistItems.length;
 
   return (
     <>
@@ -143,12 +268,13 @@ export const KanbanCard = ({ card, labels, boardId, onDelete, onUpdate, onLabels
           card={card}
           labels={labels}
           boardId={boardId}
-          onSave={(title, details, imp, dd, labelIds) => {
-            onUpdate(card.id, title, details, imp, dd, labelIds);
+          onSave={(title, details, imp, dd, labelIds, sp) => {
+            onUpdate(card.id, title, details, imp, dd, labelIds, sp);
             setEditing(false);
           }}
           onClose={() => setEditing(false)}
           onLabelsChange={onLabelsChange}
+          onChecklistChange={(items) => onCardChange({ ...card, checklistItems: items })}
         />
       )}
       <article
@@ -193,14 +319,31 @@ export const KanbanCard = ({ card, labels, boardId, onDelete, onUpdate, onLabels
                 ))}
               </div>
             )}
-            {card.dueDate && (
-              <p className={clsx(
-                "mt-1.5 text-[10px] font-semibold uppercase tracking-wide",
-                overdue ? "text-red-500" : "text-[var(--gray-text)]"
-              )}>
-                {overdue ? "⚠ " : ""}{formatDueDate(card.dueDate)}
-              </p>
-            )}
+            <div className="mt-1.5 flex flex-wrap items-center gap-2">
+              {card.dueDate && (
+                <p className={clsx(
+                  "text-[10px] font-semibold uppercase tracking-wide",
+                  overdue ? "text-red-500" : "text-[var(--gray-text)]"
+                )}>
+                  {overdue ? "⚠ " : ""}{formatDueDate(card.dueDate)}
+                </p>
+              )}
+              {card.storyPoints != null && (
+                <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[9px] font-semibold text-slate-500">
+                  {card.storyPoints} pts
+                </span>
+              )}
+              {checklistTotal > 0 && (
+                <span className={clsx(
+                  "flex items-center gap-1 rounded-full px-2 py-0.5 text-[9px] font-semibold",
+                  checklistDone === checklistTotal
+                    ? "bg-green-100 text-green-600"
+                    : "bg-slate-100 text-slate-500"
+                )}>
+                  ✓ {checklistDone}/{checklistTotal}
+                </span>
+              )}
+            </div>
           </div>
           <div className="flex flex-col gap-1 mt-0.5 opacity-0 transition-all group-hover:opacity-100">
             <button

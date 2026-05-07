@@ -4,13 +4,13 @@ import type { Importance, Label } from "@/lib/kanban";
 import { IMPORTANCE_CONFIG } from "@/lib/kanban";
 import { LabelPicker } from "@/components/LabelPicker";
 
-const initialFormState = { title: "", details: "", importance: "medium" as Importance, dueDate: "" };
+const initialFormState = { title: "", details: "", importance: "medium" as Importance, dueDate: "", storyPoints: "" };
 
 type NewCardFormProps = {
   labels?: Label[];
   boardId?: number;
   onLabelsChange?: (labels: Label[]) => void;
-  onAdd: (title: string, details: string, importance: Importance, dueDate?: string | null, labelIds?: string[]) => void;
+  onAdd: (title: string, details: string, importance: Importance, dueDate?: string | null, labelIds?: string[], storyPoints?: number | null) => void;
 };
 
 export const NewCardForm = ({ labels = [], boardId, onLabelsChange, onAdd }: NewCardFormProps) => {
@@ -21,7 +21,8 @@ export const NewCardForm = ({ labels = [], boardId, onLabelsChange, onAdd }: New
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!formState.title.trim()) return;
-    onAdd(formState.title.trim(), formState.details.trim(), formState.importance, formState.dueDate || null, selectedLabelIds);
+    const sp = formState.storyPoints ? parseInt(formState.storyPoints, 10) : null;
+    onAdd(formState.title.trim(), formState.details.trim(), formState.importance, formState.dueDate || null, selectedLabelIds, sp);
     setFormState(initialFormState);
     setSelectedLabelIds([]);
     setIsOpen(false);
@@ -67,12 +68,26 @@ export const NewCardForm = ({ labels = [], boardId, onLabelsChange, onAdd }: New
               </button>
             ))}
           </div>
-          <input
-            type="date"
-            value={formState.dueDate}
-            onChange={(e) => setFormState((p) => ({ ...p, dueDate: e.target.value }))}
-            className="w-full rounded-xl border border-[var(--stroke)] bg-white px-3 py-2 text-sm text-[var(--gray-text)] outline-none transition focus:border-[var(--primary-blue)]"
-          />
+          <div className="flex gap-2">
+            <input
+              type="date"
+              value={formState.dueDate}
+              onChange={(e) => setFormState((p) => ({ ...p, dueDate: e.target.value }))}
+              className="flex-1 rounded-xl border border-[var(--stroke)] bg-white px-3 py-2 text-sm text-[var(--gray-text)] outline-none transition focus:border-[var(--primary-blue)]"
+            />
+            <div className="relative flex items-center">
+              <input
+                type="number"
+                min={1}
+                max={999}
+                value={formState.storyPoints}
+                onChange={(e) => setFormState((p) => ({ ...p, storyPoints: e.target.value }))}
+                placeholder="SP"
+                className="w-16 rounded-xl border border-[var(--stroke)] bg-white px-2.5 py-2 text-sm text-[var(--gray-text)] outline-none transition focus:border-[var(--primary-blue)]"
+              />
+              <span className="pointer-events-none absolute right-2.5 text-[10px] text-[var(--gray-text)]">pts</span>
+            </div>
+          </div>
           {onLabelsChange && (
             <LabelPicker
               labels={labels}
@@ -91,7 +106,7 @@ export const NewCardForm = ({ labels = [], boardId, onLabelsChange, onAdd }: New
             </button>
             <button
               type="button"
-              onClick={() => { setIsOpen(false); setFormState(initialFormState); setSelectedLabelIds([]); }}
+              onClick={() => { setIsOpen(false); setFormState(initialFormState); setSelectedLabelIds([]); setSelectedLabelIds([]); }}
               className="rounded-full border border-[var(--stroke)] px-3 py-2 text-xs font-semibold uppercase tracking-wide text-[var(--gray-text)] transition hover:text-[var(--navy-dark)]"
             >
               Cancel

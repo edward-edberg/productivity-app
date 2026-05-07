@@ -1,4 +1,4 @@
-import type { BoardData, BoardSummary, Card, Importance, Label } from "./kanban";
+import type { BoardData, BoardSummary, Card, ChecklistItem, Importance, Label } from "./kanban";
 
 function boardParam(boardId?: number): string {
   return boardId !== undefined ? `?boardId=${boardId}` : "";
@@ -98,11 +98,12 @@ export async function apiCreateCard(
   dueDate?: string | null,
   labelIds?: string[],
   boardId?: number,
+  storyPoints?: number | null,
 ): Promise<Card> {
   const res = await fetch(`/api/cards${boardParam(boardId)}`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ columnId, title, details, importance, dueDate, labelIds: labelIds ?? [] }),
+    body: JSON.stringify({ columnId, title, details, importance, dueDate, labelIds: labelIds ?? [], storyPoints }),
   });
   if (!res.ok) throw new Error("Failed to create card");
   return res.json();
@@ -116,11 +117,48 @@ export async function apiUpdateCard(
   dueDate?: string | null,
   labelIds?: string[] | null,
   boardId?: number,
+  storyPoints?: number | null,
 ): Promise<void> {
   await fetch(`/api/cards/${cardId}${boardParam(boardId)}`, {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ title, details, importance, dueDate, labelIds }),
+    body: JSON.stringify({ title, details, importance, dueDate, labelIds, storyPoints }),
+  });
+}
+
+export async function apiAddChecklistItem(cardId: string, text: string, boardId?: number): Promise<ChecklistItem> {
+  const res = await fetch(`/api/cards/${cardId}/checklist${boardParam(boardId)}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ text }),
+  });
+  if (!res.ok) throw new Error("Failed to add checklist item");
+  return res.json();
+}
+
+export async function apiUpdateChecklistItem(
+  cardId: string,
+  itemId: string,
+  text: string,
+  checked: boolean,
+  boardId?: number,
+): Promise<void> {
+  await fetch(`/api/cards/${cardId}/checklist/${itemId}${boardParam(boardId)}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ text, checked }),
+  });
+}
+
+export async function apiDeleteChecklistItem(cardId: string, itemId: string, boardId?: number): Promise<void> {
+  await fetch(`/api/cards/${cardId}/checklist/${itemId}${boardParam(boardId)}`, { method: "DELETE" });
+}
+
+export async function apiSetWipLimit(columnId: string, wipLimit: number | null, boardId?: number): Promise<void> {
+  await fetch(`/api/columns/${columnId}/wip-limit${boardParam(boardId)}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ wipLimit }),
   });
 }
 

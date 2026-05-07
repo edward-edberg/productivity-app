@@ -17,7 +17,7 @@ import { BoardSelector } from "@/components/BoardSelector";
 import { UserMenu } from "@/components/UserMenu";
 import { FilterBar, emptyFilter, type FilterState } from "@/components/FilterBar";
 import { BoardStats } from "@/components/BoardStats";
-import { moveCard, type BoardData, type BoardSummary, type Importance, type Label } from "@/lib/kanban";
+import { moveCard, type BoardData, type BoardSummary, type Card, type Importance, type Label } from "@/lib/kanban";
 import {
   fetchBoard,
   fetchBoards,
@@ -146,8 +146,9 @@ export const KanbanBoard = ({ user, onLogout }: KanbanBoardProps) => {
     importance: Importance = "medium",
     dueDate?: string | null,
     labelIds?: string[],
+    storyPoints?: number | null,
   ) => {
-    const card = await apiCreateCard(columnId, title, details, importance, dueDate, labelIds, activeBoardId);
+    const card = await apiCreateCard(columnId, title, details, importance, dueDate, labelIds, activeBoardId, storyPoints);
     setBoard((prev) =>
       prev && {
         ...prev,
@@ -166,17 +167,35 @@ export const KanbanBoard = ({ user, onLogout }: KanbanBoardProps) => {
     importance: Importance,
     dueDate?: string | null,
     labelIds?: string[],
+    storyPoints?: number | null,
   ) => {
     setBoard((prev) =>
       prev && {
         ...prev,
         cards: {
           ...prev.cards,
-          [cardId]: { ...prev.cards[cardId], title, details, importance, dueDate, labelIds: labelIds ?? prev.cards[cardId].labelIds },
+          [cardId]: {
+            ...prev.cards[cardId],
+            title, details, importance, dueDate, storyPoints,
+            labelIds: labelIds ?? prev.cards[cardId].labelIds,
+          },
         },
       }
     );
-    await apiUpdateCard(cardId, title, details, importance, dueDate, labelIds, activeBoardId);
+    await apiUpdateCard(cardId, title, details, importance, dueDate, labelIds, activeBoardId, storyPoints);
+  };
+
+  const handleCardChange = (card: Card) => {
+    setBoard((prev) => prev && { ...prev, cards: { ...prev.cards, [card.id]: card } });
+  };
+
+  const handleWipLimitChange = (columnId: string, wipLimit: number | null) => {
+    setBoard((prev) =>
+      prev && {
+        ...prev,
+        columns: prev.columns.map((c) => (c.id === columnId ? { ...c, wipLimit } : c)),
+      }
+    );
   };
 
   const handleDeleteCard = (columnId: string, cardId: string) => {
@@ -260,14 +279,17 @@ export const KanbanBoard = ({ user, onLogout }: KanbanBoardProps) => {
                   key={column.id}
                   column={column}
                   cards={visibleCards}
+                  allCardCount={allCards.length}
                   labels={board.labels}
                   boardId={activeBoardId}
                   onRename={handleRenameColumn}
                   onDeleteColumn={handleDeleteColumn}
+                  onWipLimitChange={handleWipLimitChange}
                   onAddCard={handleAddCard}
                   onDeleteCard={handleDeleteCard}
                   onUpdateCard={handleUpdateCard}
                   onLabelsChange={handleLabelsChange}
+                  onCardChange={handleCardChange}
                 />
               );
             })}

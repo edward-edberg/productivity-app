@@ -57,7 +57,8 @@ def init_db():
                 id TEXT PRIMARY KEY,
                 board_id INTEGER NOT NULL REFERENCES boards(id),
                 title TEXT NOT NULL,
-                position INTEGER NOT NULL
+                position INTEGER NOT NULL,
+                wip_limit INTEGER DEFAULT NULL
             )
         """)
         conn.execute("""
@@ -68,7 +69,17 @@ def init_db():
                 details TEXT NOT NULL DEFAULT '',
                 position INTEGER NOT NULL,
                 importance TEXT NOT NULL DEFAULT 'medium',
-                due_date TEXT
+                due_date TEXT,
+                story_points INTEGER DEFAULT NULL
+            )
+        """)
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS checklist_items (
+                id TEXT PRIMARY KEY,
+                card_id TEXT NOT NULL REFERENCES cards(id),
+                text TEXT NOT NULL,
+                checked INTEGER NOT NULL DEFAULT 0,
+                position INTEGER NOT NULL
             )
         """)
         conn.execute("""
@@ -96,6 +107,12 @@ def _migrate(conn):
         conn.execute("ALTER TABLE cards ADD COLUMN importance TEXT NOT NULL DEFAULT 'medium'")
     if "due_date" not in cols:
         conn.execute("ALTER TABLE cards ADD COLUMN due_date TEXT")
+    if "story_points" not in cols:
+        conn.execute("ALTER TABLE cards ADD COLUMN story_points INTEGER DEFAULT NULL")
+
+    col_cols = {row[1] for row in conn.execute("PRAGMA table_info(columns)")}
+    if "wip_limit" not in col_cols:
+        conn.execute("ALTER TABLE columns ADD COLUMN wip_limit INTEGER DEFAULT NULL")
 
     user_cols = {row[1] for row in conn.execute("PRAGMA table_info(users)")}
     if "password_hash" not in user_cols:
@@ -111,7 +128,6 @@ def _migrate(conn):
     if "created_at" not in board_cols:
         conn.execute("ALTER TABLE boards ADD COLUMN created_at TEXT NOT NULL DEFAULT (datetime('now'))")
 
-    # labels table may not exist in older dbs
     tables = {r[0] for r in conn.execute("SELECT name FROM sqlite_master WHERE type='table'")}
     if "labels" not in tables:
         conn.execute("""
@@ -128,6 +144,16 @@ def _migrate(conn):
                 card_id TEXT NOT NULL REFERENCES cards(id),
                 label_id TEXT NOT NULL REFERENCES labels(id),
                 PRIMARY KEY (card_id, label_id)
+            )
+        """)
+    if "checklist_items" not in tables:
+        conn.execute("""
+            CREATE TABLE checklist_items (
+                id TEXT PRIMARY KEY,
+                card_id TEXT NOT NULL REFERENCES cards(id),
+                text TEXT NOT NULL,
+                checked INTEGER NOT NULL DEFAULT 0,
+                position INTEGER NOT NULL
             )
         """)
 
@@ -310,6 +336,7 @@ def delete_board(board_id: int):
         ]
         for col_id in col_ids:
             conn.execute("DELETE FROM card_labels WHERE card_id IN (SELECT id FROM cards WHERE column_id = ?)", (col_id,))
+            conn.execute("DELETE FROM checklist_items WHERE card_id IN (SELECT id FROM cards WHERE column_id = ?)", (col_id,))
             conn.execute("DELETE FROM cards WHERE column_id = ?", (col_id,))
         conn.execute("DELETE FROM labels WHERE board_id = ?", (board_id,))
         conn.execute("DELETE FROM columns WHERE board_id = ?", (board_id,))
@@ -401,6 +428,7 @@ def delete_column(column_id: str):
         ]
         for card_id in card_ids:
             conn.execute("DELETE FROM card_labels WHERE card_id = ?", (card_id,))
+            conn.execute("DELETE FROM checklist_items WHERE card_id = ?", (card_id,))
         conn.execute("DELETE FROM cards WHERE column_id = ?", (column_id,))
         conn.execute("DELETE FROM columns WHERE id = ?", (column_id,))
 
@@ -410,13 +438,18 @@ def rename_column(column_id: str, title: str):
         conn.execute("UPDATE columns SET title = ? WHERE id = ?", (title, column_id))
 
 
+def set_column_wip_limit(column_id: str, wip_limit: int | None):
+    with get_conn() as conn:
+        conn.execute("UPDATE columns SET wip_limit = ? WHERE id = ?", (wip_limit, column_id))
+
+
 # ─── Board data ────────────────────────────────────────────────────────────────
 
 def get_board_data(board_id: int) -> dict:
     with get_conn() as conn:
         board_row = conn.execute("SELECT id, name FROM boards WHERE id = ?", (board_id,)).fetchone()
         cols = conn.execute(
-            "SELECT id, title FROM columns WHERE board_id = ? ORDER BY position",
+            "SELECT id, title, wip_limit FROM columns WHERE board_id = ? ORDER BY position",
             (board_id,),
         ).fetchall()
 
@@ -437,17 +470,36 @@ def get_board_data(board_id: int) -> dict:
         for r in card_label_rows:
             card_label_map.setdefault(r["card_id"], []).append(r["label_id"])
 
+        # Load all checklist items for this board
+        checklist_rows = conn.execute(
+            """SELECT ci.id, ci.card_id, ci.text, ci.checked, ci.position
+               FROM checklist_items ci
+               JOIN cards c ON ci.card_id = c.id
+               JOIN columns col ON c.column_id = col.id
+               WHERE col.board_id = ?
+               ORDER BY ci.position""",
+            (board_id,),
+        ).fetchall()
+        checklist_map: dict[str, list[dict]] = {}
+        for r in checklist_rows:
+            checklist_map.setdefault(r["card_id"], []).append({
+                "id": r["id"],
+                "text": r["text"],
+                "checked": bool(r["checked"]),
+            })
+
         result_columns = []
         result_cards = {}
         for col in cols:
             cards = conn.execute(
-                "SELECT id, title, details, importance, due_date FROM cards WHERE column_id = ? ORDER BY position",
+                "SELECT id, title, details, importance, due_date, story_points FROM cards WHERE column_id = ? ORDER BY position",
                 (col["id"],),
             ).fetchall()
             result_columns.append({
                 "id": col["id"],
                 "title": col["title"],
                 "cardIds": [c["id"] for c in cards],
+                "wipLimit": col["wip_limit"],
             })
             for card in cards:
                 result_cards[card["id"]] = {
@@ -456,7 +508,9 @@ def get_board_data(board_id: int) -> dict:
                     "details": card["details"],
                     "importance": card["importance"],
                     "dueDate": card["due_date"],
+                    "storyPoints": card["story_points"],
                     "labelIds": card_label_map.get(card["id"], []),
+                    "checklistItems": checklist_map.get(card["id"], []),
                 }
 
         board_name = board_row["name"] if board_row else "My Board"
@@ -476,6 +530,7 @@ def create_card(
     importance: str = "medium",
     due_date: str | None = None,
     label_ids: list[str] | None = None,
+    story_points: int | None = None,
 ) -> dict:
     with get_conn() as conn:
         row = conn.execute(
@@ -486,8 +541,8 @@ def create_card(
         card_id = generate_id("card")
         importance = importance if importance in IMPORTANCE_VALUES else "medium"
         conn.execute(
-            "INSERT INTO cards (id, column_id, title, details, position, importance, due_date) VALUES (?, ?, ?, ?, ?, ?, ?)",
-            (card_id, column_id, title, details, position, importance, due_date),
+            "INSERT INTO cards (id, column_id, title, details, position, importance, due_date, story_points) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+            (card_id, column_id, title, details, position, importance, due_date, story_points),
         )
         applied_labels = label_ids or []
         for label_id in applied_labels:
@@ -501,7 +556,9 @@ def create_card(
         "details": details,
         "importance": importance,
         "dueDate": due_date,
+        "storyPoints": story_points,
         "labelIds": applied_labels,
+        "checklistItems": [],
     }
 
 
@@ -512,12 +569,13 @@ def update_card(
     importance: str = "medium",
     due_date: str | None = None,
     label_ids: list[str] | None = None,
+    story_points: int | None = None,
 ):
     importance = importance if importance in IMPORTANCE_VALUES else "medium"
     with get_conn() as conn:
         conn.execute(
-            "UPDATE cards SET title = ?, details = ?, importance = ?, due_date = ? WHERE id = ?",
-            (title, details, importance, due_date, card_id),
+            "UPDATE cards SET title = ?, details = ?, importance = ?, due_date = ?, story_points = ? WHERE id = ?",
+            (title, details, importance, due_date, story_points, card_id),
         )
         if label_ids is not None:
             conn.execute("DELETE FROM card_labels WHERE card_id = ?", (card_id,))
@@ -536,11 +594,51 @@ def delete_card(card_id: str):
         if not card:
             return
         conn.execute("DELETE FROM card_labels WHERE card_id = ?", (card_id,))
+        conn.execute("DELETE FROM checklist_items WHERE card_id = ?", (card_id,))
         conn.execute(
             "UPDATE cards SET position = position - 1 WHERE column_id = ? AND position > ?",
             (card["column_id"], card["position"]),
         )
         conn.execute("DELETE FROM cards WHERE id = ?", (card_id,))
+
+
+# ─── Checklist items ───────────────────────────────────────────────────────────
+
+def list_checklist_items(card_id: str) -> list[dict]:
+    with get_conn() as conn:
+        rows = conn.execute(
+            "SELECT id, text, checked FROM checklist_items WHERE card_id = ? ORDER BY position",
+            (card_id,),
+        ).fetchall()
+        return [{"id": r["id"], "text": r["text"], "checked": bool(r["checked"])} for r in rows]
+
+
+def create_checklist_item(card_id: str, text: str) -> dict:
+    item_id = generate_id("chk")
+    with get_conn() as conn:
+        row = conn.execute(
+            "SELECT COALESCE(MAX(position), -1) AS max_pos FROM checklist_items WHERE card_id = ?",
+            (card_id,),
+        ).fetchone()
+        position = row["max_pos"] + 1
+        conn.execute(
+            "INSERT INTO checklist_items (id, card_id, text, checked, position) VALUES (?, ?, ?, 0, ?)",
+            (item_id, card_id, text, position),
+        )
+    return {"id": item_id, "text": text, "checked": False}
+
+
+def update_checklist_item(item_id: str, text: str, checked: bool):
+    with get_conn() as conn:
+        conn.execute(
+            "UPDATE checklist_items SET text = ?, checked = ? WHERE id = ?",
+            (text, int(checked), item_id),
+        )
+
+
+def delete_checklist_item(item_id: str):
+    with get_conn() as conn:
+        conn.execute("DELETE FROM checklist_items WHERE id = ?", (item_id,))
 
 
 def move_card(card_id: str, to_column_id: str, to_position: int):
