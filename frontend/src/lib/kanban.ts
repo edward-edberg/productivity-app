@@ -1,11 +1,18 @@
 export type Importance = "low" | "medium" | "high";
 
+export type Label = {
+  id: string;
+  name: string;
+  color: string;
+};
+
 export type Card = {
   id: string;
   title: string;
   details: string;
   importance: Importance;
   dueDate?: string | null;
+  labelIds: string[];
 };
 
 export type Column = {
@@ -19,6 +26,7 @@ export type BoardData = {
   name: string;
   columns: Column[];
   cards: Record<string, Card>;
+  labels: Label[];
 };
 
 export type BoardSummary = {
@@ -56,15 +64,16 @@ export const initialData: BoardData = {
     { id: "col-done", title: "Done", cardIds: ["card-7", "card-8"] },
   ],
   cards: {
-    "card-1": { id: "card-1", title: "Align roadmap themes", details: "Draft quarterly themes with impact statements and metrics.", importance: "medium" },
-    "card-2": { id: "card-2", title: "Gather customer signals", details: "Review support tags, sales notes, and churn feedback.", importance: "low" },
-    "card-3": { id: "card-3", title: "Prototype analytics view", details: "Sketch initial dashboard layout and key drill-downs.", importance: "high" },
-    "card-4": { id: "card-4", title: "Refine status language", details: "Standardize column labels and tone across the board.", importance: "medium" },
-    "card-5": { id: "card-5", title: "Design card layout", details: "Add hierarchy and spacing for scanning dense lists.", importance: "medium" },
-    "card-6": { id: "card-6", title: "QA micro-interactions", details: "Verify hover, focus, and loading states.", importance: "high" },
-    "card-7": { id: "card-7", title: "Ship marketing page", details: "Final copy approved and asset pack delivered.", importance: "low" },
-    "card-8": { id: "card-8", title: "Close onboarding sprint", details: "Document release notes and share internally.", importance: "medium" },
+    "card-1": { id: "card-1", title: "Align roadmap themes", details: "Draft quarterly themes.", importance: "medium", labelIds: [] },
+    "card-2": { id: "card-2", title: "Gather customer signals", details: "Review support tags.", importance: "low", labelIds: [] },
+    "card-3": { id: "card-3", title: "Prototype analytics view", details: "Sketch dashboard.", importance: "high", labelIds: [] },
+    "card-4": { id: "card-4", title: "Refine status language", details: "Standardize labels.", importance: "medium", labelIds: [] },
+    "card-5": { id: "card-5", title: "Design card layout", details: "Add hierarchy.", importance: "medium", labelIds: [] },
+    "card-6": { id: "card-6", title: "QA micro-interactions", details: "Verify hover states.", importance: "high", labelIds: [] },
+    "card-7": { id: "card-7", title: "Ship marketing page", details: "Final copy approved.", importance: "low", labelIds: [] },
+    "card-8": { id: "card-8", title: "Close onboarding sprint", details: "Document release notes.", importance: "medium", labelIds: [] },
   },
+  labels: [],
 };
 
 const isColumnId = (columns: Column[], id: string) =>

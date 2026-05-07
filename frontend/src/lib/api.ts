@@ -1,4 +1,4 @@
-import type { BoardData, BoardSummary, Card, Importance } from "./kanban";
+import type { BoardData, BoardSummary, Card, Importance, Label } from "./kanban";
 
 function boardParam(boardId?: number): string {
   return boardId !== undefined ? `?boardId=${boardId}` : "";
@@ -42,6 +42,16 @@ export async function apiDeleteBoard(boardId: number): Promise<void> {
   }
 }
 
+export async function apiCreateColumn(title: string, boardId?: number): Promise<{ id: string; title: string; cardIds: string[] }> {
+  const res = await fetch(`/api/columns${boardParam(boardId)}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ title }),
+  });
+  if (!res.ok) throw new Error("Failed to create column");
+  return res.json();
+}
+
 export async function apiRenameColumn(columnId: string, title: string, boardId?: number): Promise<void> {
   await fetch(`/api/columns/${columnId}${boardParam(boardId)}`, {
     method: "PUT",
@@ -50,18 +60,49 @@ export async function apiRenameColumn(columnId: string, title: string, boardId?:
   });
 }
 
+export async function apiDeleteColumn(columnId: string, boardId?: number): Promise<void> {
+  const res = await fetch(`/api/columns/${columnId}${boardParam(boardId)}`, { method: "DELETE" });
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.detail ?? "Failed to delete column");
+  }
+}
+
+export async function apiCreateLabel(name: string, color: string, boardId?: number): Promise<Label> {
+  const res = await fetch(`/api/labels${boardParam(boardId)}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ name, color }),
+  });
+  if (!res.ok) throw new Error("Failed to create label");
+  return res.json();
+}
+
+export async function apiUpdateLabel(labelId: string, name: string, color: string, boardId?: number): Promise<void> {
+  await fetch(`/api/labels/${labelId}${boardParam(boardId)}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ name, color }),
+  });
+}
+
+export async function apiDeleteLabel(labelId: string, boardId?: number): Promise<void> {
+  await fetch(`/api/labels/${labelId}${boardParam(boardId)}`, { method: "DELETE" });
+}
+
 export async function apiCreateCard(
   columnId: string,
   title: string,
   details: string,
   importance: Importance = "medium",
   dueDate?: string | null,
+  labelIds?: string[],
   boardId?: number,
 ): Promise<Card> {
   const res = await fetch(`/api/cards${boardParam(boardId)}`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ columnId, title, details, importance, dueDate }),
+    body: JSON.stringify({ columnId, title, details, importance, dueDate, labelIds: labelIds ?? [] }),
   });
   if (!res.ok) throw new Error("Failed to create card");
   return res.json();
@@ -73,12 +114,13 @@ export async function apiUpdateCard(
   details: string,
   importance: Importance = "medium",
   dueDate?: string | null,
+  labelIds?: string[] | null,
   boardId?: number,
 ): Promise<void> {
   await fetch(`/api/cards/${cardId}${boardParam(boardId)}`, {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ title, details, importance, dueDate }),
+    body: JSON.stringify({ title, details, importance, dueDate, labelIds }),
   });
 }
 

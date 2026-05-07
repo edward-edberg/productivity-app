@@ -4,13 +4,17 @@ import { useState } from "react";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import clsx from "clsx";
-import type { Card, Importance } from "@/lib/kanban";
+import type { Card, Importance, Label } from "@/lib/kanban";
 import { IMPORTANCE_CONFIG, isOverdue, formatDueDate } from "@/lib/kanban";
+import { LabelPicker } from "@/components/LabelPicker";
 
 type KanbanCardProps = {
   card: Card;
+  labels: Label[];
+  boardId?: number;
   onDelete: (cardId: string) => void;
-  onUpdate: (cardId: string, title: string, details: string, importance: Importance, dueDate?: string | null) => void;
+  onUpdate: (cardId: string, title: string, details: string, importance: Importance, dueDate?: string | null, labelIds?: string[]) => void;
+  onLabelsChange: (labels: Label[]) => void;
 };
 
 const TrashIcon = () => (
@@ -27,15 +31,19 @@ const EditIcon = () => (
 
 type EditModalProps = {
   card: Card;
-  onSave: (title: string, details: string, importance: Importance, dueDate?: string | null) => void;
+  labels: Label[];
+  boardId?: number;
+  onSave: (title: string, details: string, importance: Importance, dueDate?: string | null, labelIds?: string[]) => void;
   onClose: () => void;
+  onLabelsChange: (labels: Label[]) => void;
 };
 
-function EditModal({ card, onSave, onClose }: EditModalProps) {
+function EditModal({ card, labels, boardId, onSave, onClose, onLabelsChange }: EditModalProps) {
   const [title, setTitle] = useState(card.title);
   const [details, setDetails] = useState(card.details);
   const [importance, setImportance] = useState<Importance>(card.importance ?? "medium");
   const [dueDate, setDueDate] = useState(card.dueDate ?? "");
+  const [selectedLabelIds, setSelectedLabelIds] = useState<string[]>(card.labelIds ?? []);
 
   return (
     <div
@@ -43,7 +51,7 @@ function EditModal({ card, onSave, onClose }: EditModalProps) {
       onClick={onClose}
     >
       <div
-        className="w-[360px] rounded-2xl border border-[var(--stroke)] bg-white p-6 shadow-[0_16px_48px_rgba(0,0,0,0.18)]"
+        className="w-[400px] max-h-[90vh] overflow-y-auto rounded-2xl border border-[var(--stroke)] bg-white p-6 shadow-[0_16px_48px_rgba(0,0,0,0.18)]"
         onClick={(e) => e.stopPropagation()}
       >
         <h3 className="mb-4 font-display text-base font-semibold text-[var(--navy-dark)]">Edit card</h3>
@@ -89,11 +97,18 @@ function EditModal({ card, onSave, onClose }: EditModalProps) {
             onChange={(e) => setDueDate(e.target.value)}
             className="w-full rounded-xl border border-[var(--stroke)] bg-white px-3 py-2 text-sm text-[var(--gray-text)] outline-none transition focus:border-[var(--primary-blue)]"
           />
+          <LabelPicker
+            labels={labels}
+            selectedIds={selectedLabelIds}
+            boardId={boardId}
+            onChange={setSelectedLabelIds}
+            onLabelsChange={onLabelsChange}
+          />
         </div>
         <div className="mt-4 flex gap-2">
           <button
             type="button"
-            onClick={() => onSave(title.trim(), details.trim(), importance, dueDate || null)}
+            onClick={() => onSave(title.trim(), details.trim(), importance, dueDate || null, selectedLabelIds)}
             className="rounded-full bg-[var(--secondary-purple)] px-4 py-2 text-xs font-semibold uppercase tracking-wide text-white transition hover:brightness-110"
           >
             Save
@@ -111,29 +126,29 @@ function EditModal({ card, onSave, onClose }: EditModalProps) {
   );
 }
 
-export const KanbanCard = ({ card, onDelete, onUpdate }: KanbanCardProps) => {
+export const KanbanCard = ({ card, labels, boardId, onDelete, onUpdate, onLabelsChange }: KanbanCardProps) => {
   const [editing, setEditing] = useState(false);
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
     useSortable({ id: card.id });
 
-  const style = {
-    transform: CSS.Transform.toString(transform),
-    transition,
-  };
-
+  const style = { transform: CSS.Transform.toString(transform), transition };
   const importance = card.importance ?? "medium";
   const overdue = isOverdue(card.dueDate);
+  const cardLabels = (card.labelIds ?? []).map((id) => labels.find((l) => l.id === id)).filter(Boolean) as Label[];
 
   return (
     <>
       {editing && (
         <EditModal
           card={card}
-          onSave={(title, details, imp, dd) => {
-            onUpdate(card.id, title, details, imp, dd);
+          labels={labels}
+          boardId={boardId}
+          onSave={(title, details, imp, dd, labelIds) => {
+            onUpdate(card.id, title, details, imp, dd, labelIds);
             setEditing(false);
           }}
           onClose={() => setEditing(false)}
+          onLabelsChange={onLabelsChange}
         />
       )}
       <article
@@ -159,18 +174,24 @@ export const KanbanCard = ({ card, onDelete, onUpdate }: KanbanCardProps) => {
         <div className="flex items-start gap-2">
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-1.5 mb-1">
-              <span
-                className={clsx(
-                  "inline-block h-2 w-2 rounded-full flex-shrink-0",
-                  IMPORTANCE_CONFIG[importance].dot
-                )}
-              />
-              <h4 className="font-display text-sm font-semibold leading-snug text-[var(--navy-dark)]">
-                {card.title}
-              </h4>
+              <span className={clsx("inline-block h-2 w-2 rounded-full flex-shrink-0", IMPORTANCE_CONFIG[importance].dot)} />
+              <h4 className="font-display text-sm font-semibold leading-snug text-[var(--navy-dark)]">{card.title}</h4>
             </div>
             {card.details && (
               <p className="mt-1 text-xs leading-5 text-[var(--gray-text)]">{card.details}</p>
+            )}
+            {cardLabels.length > 0 && (
+              <div className="mt-1.5 flex flex-wrap gap-1">
+                {cardLabels.map((label) => (
+                  <span
+                    key={label.id}
+                    className="rounded-full px-2 py-0.5 text-[9px] font-semibold text-white"
+                    style={{ backgroundColor: label.color }}
+                  >
+                    {label.name}
+                  </span>
+                ))}
+              </div>
             )}
             {card.dueDate && (
               <p className={clsx(

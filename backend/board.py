@@ -26,12 +26,17 @@ class RenameColumnBody(BaseModel):
     title: str
 
 
+class CreateColumnBody(BaseModel):
+    title: str
+
+
 class CreateCardBody(BaseModel):
     columnId: str
     title: str
     details: str = ""
     importance: str = "medium"
     dueDate: str | None = None
+    labelIds: list[str] = []
 
 
 class UpdateCardBody(BaseModel):
@@ -39,11 +44,26 @@ class UpdateCardBody(BaseModel):
     details: str
     importance: str = "medium"
     dueDate: str | None = None
+    labelIds: list[str] | None = None
 
 
 class MoveCardBody(BaseModel):
     columnId: str
     position: int
+
+
+class CreateLabelBody(BaseModel):
+    name: str
+    color: str = "#6b7280"
+
+
+class UpdateLabelBody(BaseModel):
+    name: str
+    color: str
+
+
+class SetCardLabelsBody(BaseModel):
+    labelIds: list[str]
 
 
 # ─── Board management ──────────────────────────────────────────────────────────
@@ -85,21 +105,77 @@ def get_board(board_id: int = Depends(require_board_id)):
     return db.get_board_data(board_id)
 
 
+# ─── Column management ─────────────────────────────────────────────────────────
+
+@router.post("/columns")
+def create_column(body: CreateColumnBody, board_id: int = Depends(require_board_id)):
+    col = db.create_column(board_id, body.title)
+    return col
+
+
 @router.put("/columns/{column_id}")
 def rename_column(column_id: str, body: RenameColumnBody, board_id: int = Depends(require_board_id)):
     db.rename_column(column_id, body.title)
     return {"ok": True}
 
 
+@router.delete("/columns/{column_id}")
+def delete_column(column_id: str, board_id: int = Depends(require_board_id)):
+    board = db.get_board_data(board_id)
+    if len(board["columns"]) <= 1:
+        raise HTTPException(status_code=400, detail="Cannot delete the last column")
+    db.delete_column(column_id)
+    return {"ok": True}
+
+
+# ─── Label management ──────────────────────────────────────────────────────────
+
+@router.get("/labels")
+def list_labels(board_id: int = Depends(require_board_id)):
+    return db.list_labels(board_id)
+
+
+@router.post("/labels")
+def create_label(body: CreateLabelBody, board_id: int = Depends(require_board_id)):
+    label = db.create_label(board_id, body.name, body.color)
+    return label
+
+
+@router.put("/labels/{label_id}")
+def update_label(label_id: str, body: UpdateLabelBody, board_id: int = Depends(require_board_id)):
+    db.update_label(label_id, body.name, body.color)
+    return {"ok": True}
+
+
+@router.delete("/labels/{label_id}")
+def delete_label(label_id: str, board_id: int = Depends(require_board_id)):
+    db.delete_label(label_id)
+    return {"ok": True}
+
+
+@router.put("/cards/{card_id}/labels")
+def set_card_labels(card_id: str, body: SetCardLabelsBody, board_id: int = Depends(require_board_id)):
+    db.set_card_labels(card_id, body.labelIds)
+    return {"ok": True}
+
+
+# ─── Card CRUD ─────────────────────────────────────────────────────────────────
+
 @router.post("/cards")
 def create_card(body: CreateCardBody, board_id: int = Depends(require_board_id)):
-    card = db.create_card(body.columnId, body.title, body.details, body.importance, body.dueDate)
+    card = db.create_card(
+        body.columnId, body.title, body.details,
+        body.importance, body.dueDate, body.labelIds,
+    )
     return card
 
 
 @router.put("/cards/{card_id}")
 def update_card(card_id: str, body: UpdateCardBody, board_id: int = Depends(require_board_id)):
-    db.update_card(card_id, body.title, body.details, body.importance, body.dueDate)
+    db.update_card(
+        card_id, body.title, body.details,
+        body.importance, body.dueDate, body.labelIds,
+    )
     return {"ok": True}
 
 

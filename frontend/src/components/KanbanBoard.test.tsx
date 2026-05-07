@@ -15,6 +15,7 @@ const mockBoard = {
     { id: "col-done", title: "Done", cardIds: [] },
   ],
   cards: {},
+  labels: [],
 };
 
 const mockBoards = [{ id: 1, name: "My Board", created_at: "2026-01-01" }];
@@ -23,8 +24,10 @@ vi.mock("@/lib/api", () => ({
   fetchBoard: vi.fn(),
   fetchBoards: vi.fn(),
   apiRenameColumn: vi.fn().mockResolvedValue(undefined),
+  apiCreateColumn: vi.fn().mockResolvedValue({ id: "col-new", title: "New Column", cardIds: [] }),
+  apiDeleteColumn: vi.fn().mockResolvedValue(undefined),
   apiCreateCard: vi.fn().mockImplementation((_colId: string, title: string, details: string) =>
-    Promise.resolve({ id: "card-new", title, details, importance: "medium", dueDate: null })
+    Promise.resolve({ id: "card-new", title, details, importance: "medium", dueDate: null, labelIds: [] })
   ),
   apiDeleteCard: vi.fn().mockResolvedValue(undefined),
   apiMoveCard: vi.fn().mockResolvedValue(undefined),

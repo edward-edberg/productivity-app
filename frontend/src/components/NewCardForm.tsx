@@ -1,23 +1,29 @@
 import { useState, type FormEvent } from "react";
 import clsx from "clsx";
-import type { Importance } from "@/lib/kanban";
+import type { Importance, Label } from "@/lib/kanban";
 import { IMPORTANCE_CONFIG } from "@/lib/kanban";
+import { LabelPicker } from "@/components/LabelPicker";
 
 const initialFormState = { title: "", details: "", importance: "medium" as Importance, dueDate: "" };
 
 type NewCardFormProps = {
-  onAdd: (title: string, details: string, importance: Importance, dueDate?: string | null) => void;
+  labels?: Label[];
+  boardId?: number;
+  onLabelsChange?: (labels: Label[]) => void;
+  onAdd: (title: string, details: string, importance: Importance, dueDate?: string | null, labelIds?: string[]) => void;
 };
 
-export const NewCardForm = ({ onAdd }: NewCardFormProps) => {
+export const NewCardForm = ({ labels = [], boardId, onLabelsChange, onAdd }: NewCardFormProps) => {
   const [isOpen, setIsOpen] = useState(false);
   const [formState, setFormState] = useState(initialFormState);
+  const [selectedLabelIds, setSelectedLabelIds] = useState<string[]>([]);
 
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!formState.title.trim()) return;
-    onAdd(formState.title.trim(), formState.details.trim(), formState.importance, formState.dueDate || null);
+    onAdd(formState.title.trim(), formState.details.trim(), formState.importance, formState.dueDate || null, selectedLabelIds);
     setFormState(initialFormState);
+    setSelectedLabelIds([]);
     setIsOpen(false);
   };
 
@@ -67,6 +73,15 @@ export const NewCardForm = ({ onAdd }: NewCardFormProps) => {
             onChange={(e) => setFormState((p) => ({ ...p, dueDate: e.target.value }))}
             className="w-full rounded-xl border border-[var(--stroke)] bg-white px-3 py-2 text-sm text-[var(--gray-text)] outline-none transition focus:border-[var(--primary-blue)]"
           />
+          {onLabelsChange && (
+            <LabelPicker
+              labels={labels}
+              selectedIds={selectedLabelIds}
+              boardId={boardId}
+              onChange={setSelectedLabelIds}
+              onLabelsChange={onLabelsChange}
+            />
+          )}
           <div className="flex items-center gap-2">
             <button
               type="submit"
@@ -76,7 +91,7 @@ export const NewCardForm = ({ onAdd }: NewCardFormProps) => {
             </button>
             <button
               type="button"
-              onClick={() => { setIsOpen(false); setFormState(initialFormState); }}
+              onClick={() => { setIsOpen(false); setFormState(initialFormState); setSelectedLabelIds([]); }}
               className="rounded-full border border-[var(--stroke)] px-3 py-2 text-xs font-semibold uppercase tracking-wide text-[var(--gray-text)] transition hover:text-[var(--navy-dark)]"
             >
               Cancel
