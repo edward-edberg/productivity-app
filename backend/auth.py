@@ -1,7 +1,7 @@
 import secrets
 from typing import Annotated
 
-from fastapi import APIRouter, Cookie, HTTPException, Response
+from fastapi import APIRouter, Cookie, Depends, HTTPException, Response
 from pydantic import BaseModel
 
 import database as db
@@ -76,7 +76,7 @@ def logout(response: Response, session: str | None = Cookie(default=None, alias=
 
 
 @router.get("/me")
-def me(user_id: int = __import__("fastapi").Depends(require_user_id)):
+def me(user_id: int = Depends(require_user_id)):
     user = db.get_user_by_id(user_id)
     if not user:
         raise HTTPException(status_code=401, detail="Not authenticated")
@@ -84,9 +84,9 @@ def me(user_id: int = __import__("fastapi").Depends(require_user_id)):
 
 
 @router.put("/me/password")
-def change_password(body: ChangePasswordBody, user_id: int = __import__("fastapi").Depends(require_user_id)):
-    user = db.get_user_by_username(db.get_user_by_id(user_id)["username"])
-    if not db.verify_password(body.current_password, user["password_hash"]):
+def change_password(body: ChangePasswordBody, user_id: int = Depends(require_user_id)):
+    stored_hash = db.get_user_password_hash(user_id)
+    if not db.verify_password(body.current_password, stored_hash or ""):
         raise HTTPException(status_code=401, detail="Current password is incorrect")
     if len(body.new_password) < 6:
         raise HTTPException(status_code=422, detail="Password must be at least 6 characters")
@@ -95,7 +95,7 @@ def change_password(body: ChangePasswordBody, user_id: int = __import__("fastapi
 
 
 @router.put("/me/email")
-def change_email(body: dict, user_id: int = __import__("fastapi").Depends(require_user_id)):
+def change_email(body: dict, user_id: int = Depends(require_user_id)):
     email = body.get("email", "")
     db.update_user_email(user_id, email)
     return {"ok": True}

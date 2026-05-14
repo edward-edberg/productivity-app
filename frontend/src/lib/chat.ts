@@ -1,4 +1,5 @@
 import type { BoardData } from "./kanban";
+import { boardParam } from "./api";
 
 export type ChatMessage = {
   role: "user" | "assistant";
@@ -12,8 +13,7 @@ export type ChatResponse = {
 };
 
 export async function sendChat(messages: ChatMessage[], boardId?: number): Promise<ChatResponse> {
-  const param = boardId !== undefined ? `?boardId=${boardId}` : "";
-  const res = await fetch(`/api/ai/chat${param}`, {
+  const res = await fetch(`/api/ai/chat${boardParam(boardId)}`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ messages }),

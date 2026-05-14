@@ -90,7 +90,7 @@ export const FilterBar = ({ filter, labels = [], onChange }: FilterBarProps) => 
           <div className="w-px h-4 bg-[var(--stroke)] hidden sm:block" />
           <div className="flex flex-wrap gap-1">
             {labels.map((label) => {
-              const active = filter.labelIds.includes(label.id);
+              const selected = filter.labelIds.includes(label.id);
               return (
                 <button
                   key={label.id}
@@ -98,11 +98,11 @@ export const FilterBar = ({ filter, labels = [], onChange }: FilterBarProps) => 
                   onClick={() => toggleLabel(label.id)}
                   className={clsx(
                     "flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-semibold transition",
-                    active ? "border-transparent text-white" : "border-[var(--stroke)] text-[var(--navy-dark)]"
+                    selected ? "border-transparent text-white" : "border-[var(--stroke)] text-[var(--navy-dark)]"
                   )}
-                  style={active ? { backgroundColor: label.color } : {}}
+                  style={selected ? { backgroundColor: label.color } : {}}
                 >
-                  <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: active ? "rgba(255,255,255,0.6)" : label.color }} />
+                  <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: selected ? "rgba(255,255,255,0.6)" : label.color }} />
                   {label.name}
                 </button>
               );

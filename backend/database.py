@@ -272,6 +272,12 @@ def get_user_by_id(user_id: int) -> dict | None:
         return dict(row) if row else None
 
 
+def get_user_password_hash(user_id: int) -> str | None:
+    with get_conn() as conn:
+        row = conn.execute("SELECT password_hash FROM users WHERE id = ?", (user_id,)).fetchone()
+        return row["password_hash"] if row else None
+
+
 def get_user_by_username(username: str) -> dict | None:
     with get_conn() as conn:
         row = conn.execute(
@@ -352,15 +358,11 @@ def rename_board(board_id: int, name: str):
 
 def delete_board(board_id: int):
     with get_conn() as conn:
-        col_ids = [
-            r["id"]
-            for r in conn.execute("SELECT id FROM columns WHERE board_id = ?", (board_id,)).fetchall()
-        ]
-        for col_id in col_ids:
-            conn.execute("DELETE FROM card_labels WHERE card_id IN (SELECT id FROM cards WHERE column_id = ?)", (col_id,))
-            conn.execute("DELETE FROM checklist_items WHERE card_id IN (SELECT id FROM cards WHERE column_id = ?)", (col_id,))
-            conn.execute("DELETE FROM comments WHERE card_id IN (SELECT id FROM cards WHERE column_id = ?)", (col_id,))
-            conn.execute("DELETE FROM cards WHERE column_id = ?", (col_id,))
+        card_subq = "SELECT c.id FROM cards c JOIN columns col ON c.column_id = col.id WHERE col.board_id = ?"
+        conn.execute(f"DELETE FROM card_labels WHERE card_id IN ({card_subq})", (board_id,))
+        conn.execute(f"DELETE FROM checklist_items WHERE card_id IN ({card_subq})", (board_id,))
+        conn.execute(f"DELETE FROM comments WHERE card_id IN ({card_subq})", (board_id,))
+        conn.execute("DELETE FROM cards WHERE column_id IN (SELECT id FROM columns WHERE board_id = ?)", (board_id,))
         conn.execute("DELETE FROM labels WHERE board_id = ?", (board_id,))
         conn.execute("DELETE FROM columns WHERE board_id = ?", (board_id,))
         conn.execute("DELETE FROM boards WHERE id = ?", (board_id,))
@@ -445,14 +447,10 @@ def create_column(board_id: int, title: str) -> dict:
 
 def delete_column(column_id: str):
     with get_conn() as conn:
-        card_ids = [
-            r["id"]
-            for r in conn.execute("SELECT id FROM cards WHERE column_id = ?", (column_id,)).fetchall()
-        ]
-        for card_id in card_ids:
-            conn.execute("DELETE FROM card_labels WHERE card_id = ?", (card_id,))
-            conn.execute("DELETE FROM checklist_items WHERE card_id = ?", (card_id,))
-            conn.execute("DELETE FROM comments WHERE card_id = ?", (card_id,))
+        card_subq = "SELECT id FROM cards WHERE column_id = ?"
+        conn.execute(f"DELETE FROM card_labels WHERE card_id IN ({card_subq})", (column_id,))
+        conn.execute(f"DELETE FROM checklist_items WHERE card_id IN ({card_subq})", (column_id,))
+        conn.execute(f"DELETE FROM comments WHERE card_id IN ({card_subq})", (column_id,))
         conn.execute("DELETE FROM cards WHERE column_id = ?", (column_id,))
         conn.execute("DELETE FROM columns WHERE id = ?", (column_id,))
 
@@ -524,20 +522,27 @@ def get_board_data(board_id: int) -> dict:
         ).fetchall()
         comment_count_map: dict[str, int] = {r["card_id"]: r["cnt"] for r in comment_count_rows}
 
+        all_cards = conn.execute(
+            """SELECT id, title, details, importance, due_date, story_points, assignee, column_id
+               FROM cards WHERE column_id IN (SELECT id FROM columns WHERE board_id = ?)
+               ORDER BY column_id, position""",
+            (board_id,),
+        ).fetchall()
+        cards_by_column: dict[str, list] = {}
+        for card in all_cards:
+            cards_by_column.setdefault(card["column_id"], []).append(card)
+
         result_columns = []
         result_cards = {}
         for col in cols:
-            cards = conn.execute(
-                "SELECT id, title, details, importance, due_date, story_points, assignee FROM cards WHERE column_id = ? ORDER BY position",
-                (col["id"],),
-            ).fetchall()
+            col_cards = cards_by_column.get(col["id"], [])
             result_columns.append({
                 "id": col["id"],
                 "title": col["title"],
-                "cardIds": [c["id"] for c in cards],
+                "cardIds": [c["id"] for c in col_cards],
                 "wipLimit": col["wip_limit"],
             })
-            for card in cards:
+            for card in col_cards:
                 result_cards[card["id"]] = {
                     "id": card["id"],
                     "title": card["title"],

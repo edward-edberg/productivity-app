@@ -106,7 +106,7 @@ export const NewCardForm = ({ labels = [], boardId, onLabelsChange, onAdd }: New
             </button>
             <button
               type="button"
-              onClick={() => { setIsOpen(false); setFormState(initialFormState); setSelectedLabelIds([]); setSelectedLabelIds([]); }}
+              onClick={() => { setIsOpen(false); setFormState(initialFormState); setSelectedLabelIds([]); }}
               className="rounded-full border border-[var(--stroke)] px-3 py-2 text-xs font-semibold uppercase tracking-wide text-[var(--gray-text)] transition hover:text-[var(--navy-dark)]"
             >
               Cancel

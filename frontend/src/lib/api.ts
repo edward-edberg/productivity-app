@@ -1,6 +1,6 @@
 import type { BoardData, BoardSummary, Card, ChecklistItem, Comment, Importance, Label } from "./kanban";
 
-function boardParam(boardId?: number): string {
+export function boardParam(boardId?: number): string {
   return boardId !== undefined ? `?boardId=${boardId}` : "";
 }
 

@@ -4,7 +4,8 @@
       "Bash(uv run *)",
       "Bash(bash scripts/start.sh)",
       "Bash(BASE_URL=http://localhost:8000 npm run test:e2e)",
-      "Bash(bash scripts/stop.sh)"
+      "Bash(bash scripts/stop.sh)",
+      "mcp__massive__call_api"
     ]
   }
 }

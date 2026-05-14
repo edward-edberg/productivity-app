@@ -1,6 +1,6 @@
 "use client";
 
-import type { BoardData } from "@/lib/kanban";
+import { isOverdue, type BoardData } from "@/lib/kanban";
 
 type BoardStatsProps = {
   board: BoardData;
@@ -9,13 +9,16 @@ type BoardStatsProps = {
 export const BoardStats = ({ board }: BoardStatsProps) => {
   const cards = Object.values(board.cards);
   const total = cards.length;
-  const high = cards.filter((c) => c.importance === "high").length;
-  const medium = cards.filter((c) => c.importance === "medium").length;
-  const low = cards.filter((c) => c.importance === "low").length;
-  const overdue = cards.filter((c) => {
-    if (!c.dueDate) return false;
-    return new Date(c.dueDate) < new Date(new Date().toDateString());
-  }).length;
+  const { high, medium, low, overdue } = cards.reduce(
+    (acc, c) => {
+      if (c.importance === "high") acc.high++;
+      else if (c.importance === "medium") acc.medium++;
+      else acc.low++;
+      if (isOverdue(c.dueDate)) acc.overdue++;
+      return acc;
+    },
+    { high: 0, medium: 0, low: 0, overdue: 0 },
+  );
 
   const totalPoints = cards.reduce((sum, c) => sum + (c.storyPoints ?? 0), 0);
   const doneCol = board.columns[board.columns.length - 1];
