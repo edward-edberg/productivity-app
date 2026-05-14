@@ -228,7 +228,7 @@ export const KanbanBoard = ({ user, onLogout }: KanbanBoardProps) => {
       <div className="pointer-events-none absolute bottom-0 right-0 h-[460px] w-[460px] translate-x-1/4 translate-y-1/4 rounded-full bg-[radial-gradient(circle,_rgba(117,57,145,0.14)_0%,_rgba(117,57,145,0.03)_55%,_transparent_75%)]" />
 
       <div className="relative flex flex-1 flex-col px-6 pb-10 pt-8">
-        <header className="mb-4 flex items-center justify-between gap-4 rounded-2xl border border-[var(--stroke)] bg-white/85 px-6 py-4 shadow-[var(--shadow)] backdrop-blur">
+        <header className="relative z-10 mb-4 flex items-center justify-between gap-4 rounded-2xl border border-[var(--stroke)] bg-white/85 px-6 py-4 shadow-[var(--shadow)] backdrop-blur">
           <div className="flex items-center gap-4">
             <div>
               <p className="text-[10px] font-semibold uppercase tracking-[0.35em] text-[var(--gray-text)]">
